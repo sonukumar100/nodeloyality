@@ -3,7 +3,7 @@ import { changeCurrentPassword, getCurrentUser, loginUser, logoutUser, refreshAc
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJwt } from "../middlewares/auth.middleware.js";
 import { getFilteredCoupons } from "../controllers/generateCoupon.controller.js";
-
+import { scanCoupon } from "../controllers/generateCoupon.controller.js";
 const router = Router();
 
 router.route("/register").post(
@@ -30,6 +30,7 @@ router.route('/update-cover-image').patch(verifyJwt, upload.single("coverImage")
 router.route('/send-otp').post(sendOtp);
 router.route('/verify-otp').post(verifyOtp);
 router.route('/resend-otp').post(resendOtp);
+router.route('/scan-qr-code').post(scanCoupon)
 router.route("/coupon/list").get(getFilteredCoupons);
 
 

@@ -57,6 +57,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 
  const scanCoupon = asyncHandler(async (req, res) => {
+   console.log("sss",req);
   const { couponCode } = req.body;
 
   if (!couponCode) {
