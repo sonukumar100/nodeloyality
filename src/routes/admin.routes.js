@@ -5,6 +5,7 @@ import { verifyJwt } from "../middlewares/auth.middleware.js";
 import { addGift, deleteGift, getGiftList, updateGift } from "../controllers/admin.controller.js";
 import { fileUpload } from "../controllers/file.controller.js";
 import { videoUpload } from "../controllers/video.controller.js";
+import { generateCoupon } from "../controllers/generateCoupon.controller.js";
 
 const router = Router();
 router.route('/add-gift').post( upload.fields([
@@ -27,5 +28,7 @@ router.route("/video-upload").post(
    
   ]),
   videoUpload
-);
+);  
+router.route('/generate-coupon').post(generateCoupon);
+
 export default router;
