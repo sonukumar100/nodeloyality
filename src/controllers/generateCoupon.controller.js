@@ -57,11 +57,10 @@ import { v4 as uuidv4 } from 'uuid';
 
 
  const scanCoupon = asyncHandler(async (req, res) => {
-   console.log("sss",req);
   const { couponCode } = req.body;
 
   if (!couponCode) {
-    throw new ApiError(400, "Coupon code is required");
+    throw new ApiError(404, "Coupon code is required");
   }
 
   // Find the coupon
@@ -72,7 +71,7 @@ import { v4 as uuidv4 } from 'uuid';
   }
 
   if (coupon.flag === true) {
-    throw new ApiError(400, "Coupon already used");
+    throw new ApiError(404, "Coupon already used");
   }
 
   // Update flag
