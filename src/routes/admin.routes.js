@@ -7,6 +7,7 @@ import { fileUpload } from "../controllers/file.controller.js";
 import { videoUpload } from "../controllers/video.controller.js";
 import { generateCoupon, getFilteredCoupons } from "../controllers/generateCoupon.controller.js";
 import { addProduct } from "../controllers/masterProduct.controller.js";
+import { addAccessLimit } from "../controllers/master/dailyCouponAccess.js";
 
 const router = Router();
 router.route('/add-gift').post( upload.fields([
@@ -33,7 +34,8 @@ router.route("/video-upload").post(
 router.route('/addMasterProduct').post(addProduct);
 router.route('/updateMasterProduct/:id').post(updateGift);
 router.route('/generate-coupon').post(generateCoupon);
-router.route('/coupon/list').get(getFilteredCoupons)
+router.route('/coupon/list').get(getFilteredCoupons);
+router.route('/daily-access-limit').post(addAccessLimit);
 
 
 export default router;

@@ -19,7 +19,7 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 //   .then(() => {
     app.listen(process.env.PORT || 3306 , (req, res) => {
       console.log(`⚙️  Server listening on ${process.env.PORT || 3306}.....`);
-    });
+    }); 
   // })
   // .catch((error) => {
   //   console.log(`Error listening on ${process.env.PORT}`, error);
