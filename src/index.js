@@ -17,8 +17,8 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 // connectDb()
 //   .then(() => {
-    app.listen(process.env.PORT , (req, res) => {
-      console.log(`⚙️  Server listening on ${process.env.PORT}.....`);
+    app.listen(process.env.PORT || 3306 , (req, res) => {
+      console.log(`⚙️  Server listening on ${process.env.PORT || 3306}.....`);
     });
   // })
   // .catch((error) => {
