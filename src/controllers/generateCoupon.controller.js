@@ -67,11 +67,13 @@ import { v4 as uuidv4 } from 'uuid';
   const coupon = await Coupon.findOne({ couponCode });
 
   if (!coupon) {
-    throw new ApiError(404, "Coupon not found");
+    res.status(404).json(new ApiResponse(404, coupon, "Coupon already used"));
+    // throw new ApiError(404, "Coupon not found");
   }
 
   if (coupon.flag === true) {
-    throw new ApiError(404, "Coupon already used");
+    res.status(404).json(new ApiResponse(404, coupon, "Coupon already used"));
+    // throw new ApiError(404, "Coupon already used");
   }
 
   // Update flag

@@ -6,6 +6,9 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from 'jsonwebtoken';
 import { sendEmail } from "../utils/nodemailer.js";
 import { generateAccessToken } from "../middlewares/auth.middleware.js";
+// const {pool} = require("../db/index.js");
+import {pool} from "../db/index.js";
+// const { pool } = require('../db/index.js'); // adjust the path as needed
 
 //Generate Access and Refresh Token Controller
 const generateAccessAndRefreshToken = async (userId) => {
@@ -396,71 +399,74 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
   res.status(201).json(new ApiResponse(200, updatedUser, "Successfully updated cover image!"))
 })
 
-const sendOtp = asyncHandler(async (req, res) => {
-  const {email} = req.body
-  if (!email ) {
-    throw new ApiError(400, "Email required!");
-  }
-  const otp = Math.floor(100000 + Math.random() * 900000);
-  const existedUser = await User.findOne({
-    $or: [{ email: email }],
-  });
-  // if (!existedUser) {
-  //   throw new ApiError(409, "User with email or phone number does not exist!");
-  // }
-  const otpExpireTime = Date.now() + 10 * 60 * 1000; // 10 minutes
-  if(existedUser?.email === email){
-    await User.findByIdAndUpdate(existedUser._id, {
-      $set: {
-        otp: otp,
-        otpExpireTime: otpExpireTime
-      }
-    })
-    console.log("-otp save",otp);
-
-    await sendEmail(email, otp)
-    return res
-    .status(200)
-    .json(new ApiResponse(200,existedUser?.email, "Otp send successfully!"));
-  }
-else{  const user = await User.create({
-    email,
-    otp,
-    otpExpireTime
-  });
-  return res
-    .status(200)
-    .json(new ApiResponse(200,user?.email, "Otp send successfully!"));
-}
-})
-/// verify otp ///
-const verifyOtp = asyncHandler(async (req, res) => {
-  const { email,otp } = req.body;
-  if (!otp || !email) {
-    throw new ApiError(400, "Otp required and email required!");
-  }
-  const user = await User.findOne(
-    {
-      $or: [{ email: email }],
-    }
+      const sendOtp = asyncHandler(async (req, res) => {
+        const { email } = req.body;
+        if (!email) {
+          throw new ApiError(400, "Email required!");
+        }
+        const otp = Math.floor(100000 + Math.random() * 900000);
+        const otpExpireTime = Date.now() + 10 * 60 * 1000;
+      //  const conn = await pool.getConnection();
+      const [results] = await pool.execute("SELECT * FROM users WHERE email = ?", [email]);
+if (results.length > 0) {
+  const userId = results[0].id;
+  await pool.execute(
+    "UPDATE users SET otp = ?, otpExpireTime = ? WHERE id = ?",
+    [otp, otpExpireTime, userId]
   );
-  console.log("verify",user,user?.otp, otp);
+  await sendEmail(email, otp);
+  return res.status(200).json(new ApiResponse(200, email, "OTP sent successfully!"));
+} else {
+  await pool.execute(
+    "INSERT INTO users (email, otp, otpExpireTime) VALUES (?, ?, ?)",
+    [email, otp, otpExpireTime]
+  );
 
-  if(user?.otp != otp){
-    throw new ApiError(400, "Invalid or expired OTP");
+  console.log("-new user added and otp sent:", otp);
+  await sendEmail(email, otp);
+
+  return res.status(200).json(new ApiResponse(200, email, "OTP sent successfully!"));
+}
+      });
+/// verify otp ///
+
+
+const verifyOtp = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!otp || !email) {
+    throw new ApiError(400, "Otp and email are required!");
   }
-  if(user?.otpExpireTime < Date.now()){
-    throw new ApiError(400, "OTP expired!");
+
+  try {
+    const [results] = await pool.execute(
+      "SELECT * FROM users WHERE email = ?",
+      [email]
+    );
+
+    const user = results[0];
+
+    if (!user) {
+      throw new ApiError(400, "Invalid or expired OTP");
+    }
+
+    console.log("verify", user, user.otp, otp);
+
+    if (user.otp !== otp) {
+      throw new ApiError(400, "Invalid or expired OTP");
+    }
+    if (user.otpExpireTime < Date.now()) {
+      throw new ApiError(400, "OTP expired!");
+    }
+    const token = generateAccessToken(user);
+    return res
+      .status(200)
+      .json(new ApiResponse(200, user, { token }, "Otp verified successfully!"));
+  } catch (error) {
+    throw new ApiError(500, "Database error: " + error.message);
   }
- console.log("verify",user);
-  if (!user) {
-    throw new ApiError(400, "Invalid or expired OTP");
-  } console.log("verify",user);
-  const token = generateAccessToken(user)
-  return res
-    .status(200)
-    .json(new ApiResponse(200,user,{token:token}, "Otp verified successfully!"));
-})
+});
+
 /// resend otp ///
 const resendOtp = asyncHandler(async (req, res) => {
   const {email} = req.body

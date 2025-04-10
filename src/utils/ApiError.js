@@ -8,7 +8,6 @@ class ApiError extends Error {
     super(message);
     this.statusCode = statusCode;
     this.data = null;
-    this.message = message;
     this.success = false;
     this.errors = errors;
 
@@ -16,14 +15,18 @@ class ApiError extends Error {
     if (stack) {
       this.stack = stack;
     } else {
-      // Use Error.captureStackTrace to capture the stack trace
       Error.captureStackTrace(this, this.constructor);
     }
+  }
+
+  toJSON() {
+    return {
+      success: false,
+      message: this.message,
+      errors: this.errors,
+      stack: process.env.NODE_ENV === "development" ? this.stack : undefined,
+    };
   }
 }
 
 export default ApiError;
-
-// Example usage:
-// const apiError = new ApiError(404, "Resource not found", ["Invalid ID"])
-// console.error(apiError)
