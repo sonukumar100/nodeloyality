@@ -34,4 +34,5 @@ router.route('/scan-qr-code').post(scanCoupon)
 router.route("/coupon/list").get(getFilteredCoupons);
 
 
+
 export default router;

@@ -5,7 +5,8 @@ import { verifyJwt } from "../middlewares/auth.middleware.js";
 import { addGift, deleteGift, getGiftList, updateGift } from "../controllers/admin.controller.js";
 import { fileUpload } from "../controllers/file.controller.js";
 import { videoUpload } from "../controllers/video.controller.js";
-import { generateCoupon } from "../controllers/generateCoupon.controller.js";
+import { generateCoupon, getFilteredCoupons } from "../controllers/generateCoupon.controller.js";
+import { addProduct } from "../controllers/masterProduct.controller.js";
 
 const router = Router();
 router.route('/add-gift').post( upload.fields([
@@ -29,6 +30,10 @@ router.route("/video-upload").post(
   ]),
   videoUpload
 );  
+router.route('/addMasterProduct').post(addProduct);
+router.route('/updateMasterProduct/:id').post(updateGift);
 router.route('/generate-coupon').post(generateCoupon);
+router.route('/coupon/list').get(getFilteredCoupons)
+
 
 export default router;
