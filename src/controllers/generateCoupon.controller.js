@@ -80,6 +80,8 @@ const scanCoupon = asyncHandler(async (req, res) => {
     if (coupon.flag === 1) {
       return res.status(400).json(new ApiResponse(400, coupon, "Coupon already used"));
     }
+  
+
 
     // 2. Get user
     const [userRows] = await pool.execute(
@@ -92,6 +94,26 @@ const scanCoupon = asyncHandler(async (req, res) => {
     if (!user) {
       return res.status(404).json(new ApiResponse(404, null, "User not found"));
     }
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0); // midnight today
+    
+    const [scanCountRows] = await pool.execute(
+      `SELECT COUNT(*) as scanCount FROM coupons 
+       WHERE JSON_EXTRACT(user, '$.id') = ? AND flag = 1 AND updatedAt >= ?`,
+      [user.id, todayStart.toISOString()]
+    );
+    
+    const scanCount = scanCountRows[0].scanCount;
+    const [limitRows] = await pool.execute(
+      "SELECT accessLimit FROM dailyaccesslimit LIMIT 1"
+    );
+    const accessLimit = limitRows[0]?.accessLimit 
+    if (scanCount >= accessLimit) {
+      return res.status(400).json(
+        new ApiResponse(400, null, "Daily scan limit of 5 coupons reached.")
+      );
+    }
+    
 
     // 3. Assign points based on coupon type
     let newKarigerPoints = user.karigerPoints || 0;
@@ -111,8 +133,17 @@ const scanCoupon = asyncHandler(async (req, res) => {
 
     // 5. Update coupon as used
     await pool.execute(
-      "UPDATE coupons SET flag = 1, updatedAt = NOW() WHERE id = ?",
-      [coupon.id]
+      "UPDATE coupons SET flag = 1, updatedAt = NOW(), user = ? WHERE id = ?",
+      [
+        JSON.stringify({
+          id: user.id,
+          fullName: user.fullName,
+          email: user.email,
+          phone: user.phone, // optional, include if needed
+          type: user.type     // optional, if useful
+        }),
+        coupon.id
+      ]
     );
 
     // 6. Return updated info
@@ -132,35 +163,51 @@ const scanCoupon = asyncHandler(async (req, res) => {
 });
     
 
-  const getFilteredCoupons = asyncHandler(async (req, res) => {
-    const { filter } = req.query;
-  
-    let sql = "SELECT * FROM coupons";
-    let params = [];
-  
-    // Add WHERE clause based on filter
-    if (filter === "scanned") {
-      sql += " WHERE flag = 1";
-    } else if (filter === "available") {
-      sql += " WHERE flag = 0";
-    } else if (filter && filter !== "scanned" && filter !== "available") {
-      throw new ApiError(400, "Invalid filter. Use 'scanned', 'available' or leave it empty.");
-    }
-  
-    try {
-      const [coupons] = await pool.execute(sql, params);
-  
-      return res.status(200).json(
-        new ApiResponse(
-          200,
-          coupons,
-          `${filter || "all"} coupons fetched successfully`
-        )
-      );
-    } catch (error) {
-      throw new ApiError(500, "Database error: " + error.message);
-    }
-  });
+const getFilteredCoupons = asyncHandler(async (req, res) => {
+  const { filter } = req.query;
+
+  let sql = "SELECT * FROM coupons";
+  let params = [];
+
+  // Add WHERE clause based on filter
+  if (filter === "scanned") {
+    sql += " WHERE flag = 1";
+  } else if (filter === "available") {
+    sql += " WHERE flag = 0";
+  } else if (filter && filter !== "scanned" && filter !== "available") {
+    throw new ApiError(400, "Invalid filter. Use 'scanned', 'available' or leave it empty.");
+  }
+
+  try {
+    const [coupons] = await pool.execute(sql, params);
+
+    // Parse user JSON field if exists
+    const parsedCoupons = coupons.map(coupon => {
+      try {
+        return {
+          ...coupon,
+          user: coupon.user ? JSON.parse(coupon.user) : null
+        };
+      } catch (err) {
+        return {
+          ...coupon,
+          user: null // fallback if parsing fails
+        };
+      }
+    });
+
+    return res.status(200).json(
+      new ApiResponse(
+        200,
+        parsedCoupons,
+        `${filter || "all"} coupons fetched successfully`
+      )
+    );
+  } catch (error) {
+    throw new ApiError(500, "Database error: " + error.message);
+  }
+});
+
     
   
   
