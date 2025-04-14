@@ -6,8 +6,11 @@ import { addGift, deleteGift, getGiftList, updateGift } from "../controllers/adm
 import { fileUpload } from "../controllers/file.controller.js";
 import { videoUpload } from "../controllers/video.controller.js";
 import { generateCoupon, getFilteredCoupons } from "../controllers/generateCoupon.controller.js";
-import { addProduct } from "../controllers/masterProduct.controller.js";
+import { addOrUpdateProduct, deleteProduct, getAllMasterProducts } from "../controllers/masterProduct.controller.js";
 import { addAccessLimit } from "../controllers/master/dailyCouponAccess.js";
+import { addOrUpdateVideo, deleteVideo, getAllVideos } from "../controllers/master/addVideo.controller.js";
+import { addCatalogItem, deleteCatalogItem, editCatalogItem, listCatalogItems } from "../controllers/master/catalog.controller.js";
+import { createOffer, getOfferGifts, getOffers, updateOffer } from "../controllers/offers/offer.js";
 
 const router = Router();
 router.route('/add-gift').post( upload.fields([
@@ -31,11 +34,39 @@ router.route("/video-upload").post(
   ]),
   videoUpload
 );  
-router.route('/addMasterProduct').post(addProduct);
+router.route('/addMasterProduct').post(addOrUpdateProduct);
+router.route('/get-masterProduct').get(getAllMasterProducts);
+router.route('/deleteMasterProduct/:id').delete(deleteProduct);
 router.route('/updateMasterProduct/:id').post(updateGift);
 router.route('/generate-coupon').post(generateCoupon);
 router.route('/coupon/list').get(getFilteredCoupons);
 router.route('/daily-access-limit').post(addAccessLimit);
+router.route('/add-video').post(addOrUpdateVideo);
+router.route('/delete-video/:id').delete(deleteVideo);
+router.route('/get-video').get(getAllVideos);
+router.route('/add-digital-catalog').post(
+  upload.fields([
+  {
+    name: "cataLogFile",
+    maxCount: 1,
+  },
+]),addCatalogItem);
+router.route('/delete-catalog/:id').delete(deleteCatalogItem);
+router.route('/edit-catalog/:id').post(editCatalogItem);
+router.route('/get-digital-catalog').get(listCatalogItems);
+router.route('/addOffer').post(createOffer);
+router.route('/get-offers').get(getOffers); 
+router.route('/offers/:id/gifts').get(getOfferGifts);
+router.route('/update-offer/:id').post(
+  // upload.fields([
+  //   {
+  //     name: "avatar",
+  //     maxCount: 1,
+  //   },
+  // ]),
+  updateOffer
+);
+
 
 
 export default router;

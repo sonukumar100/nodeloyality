@@ -25,7 +25,7 @@ console.log("Connecting to MariaDB...",process.env.DB_HOST);
     password: process.env.DB_PASSWORD || "",
     database: process.env.DB_NAME,
     waitForConnections: true,
-    connectionLimit: 20,
+    connectionLimit: 100,
     queueLimit: 0,
   });
 

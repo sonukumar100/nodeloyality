@@ -4,6 +4,7 @@ import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJwt } from "../middlewares/auth.middleware.js";
 import { getFilteredCoupons } from "../controllers/generateCoupon.controller.js";
 import { scanCoupon } from "../controllers/generateCoupon.controller.js";
+import { cancelRedeemRequest, RedeemRequest } from "../controllers/redeemRequest/redeem.controller.js";
 const router = Router();
 
 router.route("/register").post(
@@ -32,6 +33,8 @@ router.route('/verify-otp').post(verifyOtp);
 router.route('/resend-otp').post(resendOtp);
 router.route('/scan-qr-code').post(scanCoupon)
 router.route("/coupon/list").get(getFilteredCoupons);
+router.route('/redeem-request').post(RedeemRequest);
+router.route('/redeem-request/cancel').post(cancelRedeemRequest);
 
 
 
