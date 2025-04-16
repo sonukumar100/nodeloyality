@@ -12,6 +12,7 @@ export const addGiftGallery = asyncHandler (async(req, res) => {
     // }
     const fileName = req.files?.giftImage?.[0]?.originalname;
     const uploaded  = await uploadOnCloudinary(giftImage);
+    console.log("File URL:giftType=================> ",giftType);
     try {
 
         await pool.query(
@@ -29,41 +30,71 @@ export const addGiftGallery = asyncHandler (async(req, res) => {
     }
 });
 export const giftGalleryList = asyncHandler(async (req, res) => {
-    const { giftType, points, giftTitle } = req.query;
+    const { giftType, points, giftTitle, page = 1, limit = 10 } = req.query;
 
     try {
-        // Base SQL query
         let query = 'SELECT * FROM gifts WHERE 1=1';
-        let params = [];
+        let countQuery = 'SELECT COUNT(*) as total FROM gifts WHERE 1=1';
+        let activeCountQuery = 'SELECT COUNT(*) as totalActive FROM gifts WHERE giftStatus = 1';
+        let inactiveCountQuery = 'SELECT COUNT(*) as totalInactive FROM gifts WHERE giftStatus = 0';
 
-        // Add filter for giftType if provided
+        let params = [];
+        let countParams = [];
+
+        // Filters
         if (giftType) {
             query += ' AND giftType = ?';
+            countQuery += ' AND giftType = ?';
             params.push(giftType);
+            countParams.push(giftType);
         }
 
-        // Add filter for points if provided
         if (points) {
             query += ' AND points = ?';
+            countQuery += ' AND points = ?';
             params.push(points);
+            countParams.push(points);
         }
 
-        // Add filter for giftTitle if provided
         if (giftTitle) {
             query += ' AND giftTitle LIKE ?';
+            countQuery += ' AND giftTitle LIKE ?';
             params.push(`%${giftTitle}%`);
+            countParams.push(`%${giftTitle}%`);
         }
 
-        // Execute query
+        // Pagination
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+        query += ' LIMIT ? OFFSET ?';
+        params.push(parseInt(limit), offset);
+
+        // Fetch data
         const [rows] = await pool.query(query, params);
 
-        // Return the result
-        res.status(200).json({data:rows});
+        // Fetch count for pagination
+        const [[{ total }]] = await pool.query(countQuery, countParams);
+        const [[{ totalActive }]] = await pool.query(activeCountQuery);
+        const [[{ totalInactive }]] = await pool.query(inactiveCountQuery);
+
+        const totalPages = Math.ceil(total / limit);
+
+        // Send response
+        res.status(200).json({
+            data: rows,
+            pagination: {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            total,
+            totalActive,
+            totalInactive,
+            totalPages}
+        });
     } catch (error) {
         console.error('Error fetching gift gallery:', error);
         res.status(500).json({ error: 'Something went wrong while fetching gift gallery' });
     }
 });
+
 export const deleteGift = asyncHandler(async (req, res) => {
     const { id } = req.params;
 

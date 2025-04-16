@@ -14,16 +14,16 @@ import { createOffer, getOfferGifts, getOffers, updateOffer, updateOfferStatus }
 import { addGiftGallery, giftGalleryList } from "../controllers/master/addGift.controller.js";
 
 const router = Router();
-router.route('/add-gift').post( upload.fields([
-    {
-      name: "avatar",
-      maxCount: 1,
-    },
+// router.route('/add-gift').post( upload.fields([
+//     {
+//       name: "avatar",
+//       maxCount: 1,
+//     },
     
-  ]),addGift);
+//   ]),addGiftGallery);
 router.route('/update-gift/:id').post(updateGift);
 router.route('/delete-gift/:id').delete(deleteGift);
-router.route('/gift-list').get(verifyJwt,getGiftList);
+router.route('/gift-gallery-list').get(giftGalleryList);
 router.route('/file-upload').post(fileUpload)
 router.route("/video-upload").post(
   upload.fields([ 
@@ -83,7 +83,6 @@ router.route('/add-gift-gallery').post(
   ]),
   addGiftGallery
 );
-router.route('/get-gift-gallery').get(giftGalleryList);
 
 
 
