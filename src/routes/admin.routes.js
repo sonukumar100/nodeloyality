@@ -10,7 +10,8 @@ import { addOrUpdateProduct, deleteProduct, getAllMasterProducts } from "../cont
 import { addAccessLimit } from "../controllers/master/dailyCouponAccess.js";
 import { addOrUpdateVideo, deleteVideo, getAllVideos } from "../controllers/master/addVideo.controller.js";
 import { addCatalogItem, deleteCatalogItem, editCatalogItem, listCatalogItems } from "../controllers/master/catalog.controller.js";
-import { createOffer, getOfferGifts, getOffers, updateOffer } from "../controllers/offers/offer.js";
+import { createOffer, getOfferGifts, getOffers, updateOffer, updateOfferStatus } from "../controllers/offers/offer.js";
+import { addGiftGallery, giftGalleryList } from "../controllers/master/addGift.controller.js";
 
 const router = Router();
 router.route('/add-gift').post( upload.fields([
@@ -54,8 +55,15 @@ router.route('/add-digital-catalog').post(
 router.route('/delete-catalog/:id').delete(deleteCatalogItem);
 router.route('/edit-catalog/:id').post(editCatalogItem);
 router.route('/get-digital-catalog').get(listCatalogItems);
-router.route('/addOffer').post(createOffer);
+router.route('/add-offer').post( 
+  upload.fields([
+    {
+      name: "offerImage",
+      maxCount: 1,
+    },
+  ]),createOffer);
 router.route('/get-offers').get(getOffers); 
+router.route('/update-offer-status').put(updateOfferStatus);
 router.route('/offers/:id/gifts').get(getOfferGifts);
 router.route('/update-offer/:id').post(
   // upload.fields([
@@ -66,6 +74,16 @@ router.route('/update-offer/:id').post(
   // ]),
   updateOffer
 );
+router.route('/add-gift-gallery').post(
+  upload.fields([
+    {
+      name: "giftImage",
+      maxCount: 1,
+    },
+  ]),
+  addGiftGallery
+);
+router.route('/get-gift-gallery').get(giftGalleryList);
 
 
 
