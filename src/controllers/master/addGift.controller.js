@@ -4,7 +4,7 @@ import { uploadOnCloudinary } from "../../utils/cloudinary.js";
 
 
 export const addGiftGallery = asyncHandler (async(req, res) => {
-    const { giftTitle, points, giftType } = req.body;
+    const { giftTitle, points, giftType,specifications } = req.body;
     console.log("giftImage", req.files);
     const giftImage = req.files?.giftImage?.[0]?.path;
     // if (!giftImage) {
@@ -16,9 +16,9 @@ export const addGiftGallery = asyncHandler (async(req, res) => {
     try {
 
         await pool.query(
-            `INSERT INTO gifts (giftTitle, points, giftType, url)
-             VALUES (?, ?, ?, ?)`,
-            [giftTitle, parseInt(points), giftType, uploaded?.secure_url || uploaded?.url]
+            `INSERT INTO gifts (giftTitle, points, giftType,specifications, url)
+             VALUES (?, ?, ?, ?, ?)`,
+            [giftTitle, parseInt(points), giftType,specifications, uploaded?.secure_url || uploaded?.url]
         );
 
         // await pool.re();
@@ -63,37 +63,42 @@ export const giftGalleryList = asyncHandler(async (req, res) => {
             countParams.push(`%${giftTitle}%`);
         }
 
+        // Order by newest first
+        query += ' ORDER BY id DESC'; // or 'createdAt DESC' if timestamp exists
+
         // Pagination
         const offset = (parseInt(page) - 1) * parseInt(limit);
         query += ' LIMIT ? OFFSET ?';
         params.push(parseInt(limit), offset);
 
-        // Fetch data
+        // Fetch gift list
         const [rows] = await pool.query(query, params);
 
-        // Fetch count for pagination
+        // Count totals
         const [[{ total }]] = await pool.query(countQuery, countParams);
         const [[{ totalActive }]] = await pool.query(activeCountQuery);
         const [[{ totalInactive }]] = await pool.query(inactiveCountQuery);
 
         const totalPages = Math.ceil(total / limit);
 
-        // Send response
+        // Response
         res.status(200).json({
             data: rows,
             pagination: {
-            page: parseInt(page),
-            limit: parseInt(limit),
-            total,
-            totalActive,
-            totalInactive,
-            totalPages}
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                totalActive,
+                totalInactive,
+                totalPages,
+            },
         });
     } catch (error) {
         console.error('Error fetching gift gallery:', error);
         res.status(500).json({ error: 'Something went wrong while fetching gift gallery' });
     }
 });
+
 
 export const deleteGift = asyncHandler(async (req, res) => {
     const { id } = req.params;
@@ -112,24 +117,40 @@ export const deleteGift = asyncHandler(async (req, res) => {
     }
 });
 export const updateGift = asyncHandler(async (req, res) => {
-    const { id } = req.params;
-    const { giftTitle, points, giftType } = req.body;
-    const giftImage = req.files?.giftImage?.[0]?.path;
-    const fileName = req.files?.giftImage?.[0]?.originalname;
-    const uploaded  = await uploadOnCloudinary(giftImage);
+    // const { id } = req.params;
+    const { giftTitle, points, giftType,specifications,id, } = req.body;
+  
     try {
-        const [result] = await pool.query(
-            'UPDATE gifts SET giftTitle = ?, points = ?, giftType = ?, url = ? WHERE id = ?',
-            [giftTitle, parseInt(points), giftType, uploaded?.secure_url || uploaded?.url, id]
-        );
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: 'Gift not found' });
-        }
-
-        res.status(200).json({ message: 'Gift updated successfully' });
+      let uploadedImageUrl;
+  
+      // If a new image is uploaded, handle it
+      const giftImage = req.files?.giftImage?.[0]?.path;
+      if (giftImage) {
+        const uploaded = await uploadOnCloudinary(giftImage);
+        uploadedImageUrl = uploaded?.secure_url || uploaded?.url;
+      }
+  
+      let query = 'UPDATE gifts SET giftTitle = ?, points = ?, giftType = ?, specifications = ?';
+      const queryParams = [giftTitle, parseInt(points), giftType,specifications];
+  
+      // Append image URL update only if image is uploaded
+      if (uploadedImageUrl) {
+        query += ', url = ?';
+        queryParams.push(uploadedImageUrl);
+      }
+  
+      query += ' WHERE id = ?';
+      queryParams.push(id);
+  
+      const [result] = await pool.query(query, queryParams);
+  
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Gift not found' });
+      }
+  
+      res.status(200).json({ message: 'Gift updated successfully' });
     } catch (error) {
-        console.error('Error updating gift:', error);
-        res.status(500).json({ message: 'Failed to update gift', error });
+      console.error('Error updating gift:', error);
+      res.status(500).json({ message: 'Failed to update gift', error });
     }
-});
+  });
