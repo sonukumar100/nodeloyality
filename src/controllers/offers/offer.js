@@ -34,7 +34,7 @@ console.log("File URL: ",url.secure_url || url.url);
   try {
     const conn = await pool.getConnection();
 
-    await conn.query(insertQuery, [
+    await pool.query(insertQuery, [
       user_type,
       title,
       offer_code,
@@ -49,7 +49,7 @@ console.log("File URL: ",url.secure_url || url.url);
 
     ]);
 
-    conn.release();
+  
     res.status(201).json({ message: 'Offer created successfully.' });
 
   } catch (error) {
@@ -95,9 +95,9 @@ export const getOffers = async (req, res) => {
   }
 
   try {
-    const conn = await pool.getConnection();
+    // const conn = await pool.getConnection();
 
-    const [offers] = await conn.query(`SELECT * FROM offers ORDER BY created_at DESC`);
+    const [offers] = await pool.query(`SELECT * FROM offers ORDER BY created_at DESC`);
 
     const parsedOffers = offers.map(offer => {
       return {
@@ -132,7 +132,7 @@ export const getOffers = async (req, res) => {
       for (const gift of offer.gifts) {
         if (!gift?.id) continue;
 
-        const [rows] = await conn.query(
+        const [rows] = await pool.query(
           `SELECT COUNT(*) AS count FROM redeemRequest WHERE offer_id = ? AND gift_id = ? AND is_cancellation = FALSE`,
           [offer.id, gift.id]
         );
@@ -141,7 +141,7 @@ export const getOffers = async (req, res) => {
       }
     }
 
-    conn.release();
+  
 
     const paginatedOffers = filteredOffers.slice(offset, offset + limit);
     const totalActive = parsedOffers.filter(o => o.offerStatus === 1).length;
@@ -203,7 +203,7 @@ export const updateOffer = asyncHandler(async (req, res) => {
   try {
     const conn = await pool.getConnection();
 
-    await conn.query(updateQuery, [
+    await pool.query(updateQuery, [
       user_type,
       title,
       offer_code,
@@ -218,7 +218,7 @@ export const updateOffer = asyncHandler(async (req, res) => {
       offer_id
     ]);
 
-    conn.release();
+  
     res.status(200).json({ message: 'Offer updated successfully.' });
 
   } catch (error) {
@@ -239,9 +239,9 @@ export const updateOfferStatus = asyncHandler(async (req, res) => {
   try {
     const conn = await pool.getConnection();
 
-    await conn.query(updateQuery, [offerStatus, offer_id]);
+    await pool.query(updateQuery, [offerStatus, offer_id]);
 
-    conn.release();
+  
     res.status(200).json({ message: 'Offer status updated successfully.' });
 
   } catch (error) {
@@ -252,39 +252,54 @@ export const updateOfferStatus = asyncHandler(async (req, res) => {
 
 
 export const getOfferGifts = async (req, res) => {
-  const offerId = req.params.id
+  const offerId = req.params.id;
 
   try {
-    const conn = await pool.getConnection()
+    const [rows] = await pool.query(
+      // `SELECT * FROM offers WHERE id = ?`,
+      `SELECT id, title, user_type,offer_code,description,start_date,end_date,offerStatus,url, gifts FROM offers WHERE id = ?`,
 
-    const [rows] = await conn.query(
-      `SELECT gifts FROM offers WHERE id = ?`,
       [offerId]
-    )
-
-    conn.release()
+    );
 
     if (rows.length === 0) {
-      return res.status(404).json({ message: 'Offer not found' })
+      return res.status(404).json({ message: 'Offer not found' });
     }
 
-    let gifts = JSON.parse(rows[0].gifts || '[]')
+    const offer = rows[0];
 
-    // If it's an array of strings, convert them to objects
+    let gifts;
+
+    try {
+      gifts = doubleParse(offer.gifts || '[]');
+      // states = doubleParse(offer.states || '[]');
+      // states = doubleParse(offer.states || '[]');
+
+    } catch (jsonError) {
+      return res.status(500).json({ message: 'Invalid JSON in gifts field' });
+    }
+
+    // Convert array of strings to array of objects
     if (Array.isArray(gifts) && typeof gifts[0] === 'string') {
       gifts = gifts.map((title, index) => ({
         id: index + 1,
         title,
-        description: `${title} gift`, // or customize description
-      }))
+        description: `${title} gift`,
+      }));
     }
 
-    res.status(200).json({ gifts })
+    // Attach parsed/structured gifts to offer
+    offer.gifts = gifts;
+    // offer.states = states;
+
+    return res.status(200).json({ offer });
   } catch (error) {
-    console.error('Error fetching offer gifts:', error)
-    res.status(500).json({ message: 'Failed to fetch gifts', error })
+    console.error('Error fetching offer:', error);
+    return res.status(500).json({ message: 'Failed to fetch offer', error });
   }
-}
+};
+
+
 
 
 

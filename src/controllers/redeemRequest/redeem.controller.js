@@ -1,5 +1,5 @@
-import {pool} from '../../db/index.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
+import { pool } from '../../db/index.js';
 
 
 export const RedeemRequest = asyncHandler(async (req, res) => {
@@ -14,7 +14,6 @@ export const RedeemRequest = asyncHandler(async (req, res) => {
     is_cancellation,
   } = req.body;
 
-  // Validate all required fields
   if (
     !otp ||
     typeof same_permanment_address !== "boolean" ||
@@ -31,7 +30,7 @@ export const RedeemRequest = asyncHandler(async (req, res) => {
   const conn = await pool.getConnection();
 
   try {
-    // Insert the redeem request into the database
+    // Step 1: Insert redeem request without request_id
     const [result] = await conn.execute(
       `INSERT INTO redeemRequest (
         otp, same_permanment_address, shipping_address, cancelation_policy,
@@ -49,41 +48,106 @@ export const RedeemRequest = asyncHandler(async (req, res) => {
       ]
     );
 
-    // After the redeem request is created, reduce the user's points
+    const insertedId = result.insertId;
+
+    // Step 2: Generate the request_id like "R0000001"
+    const requestId = `R${String(insertedId).padStart(7, "0")}`;
+
+    // Step 3: Update the request_id in the database immediately after insert
+    await conn.execute(
+      `UPDATE redeemRequest SET request_id = ? WHERE id = ?`,
+      [requestId, insertedId]
+    );
+
+    // Step 4: Deduct points if not a cancellation
     if (!is_cancellation) {
-      // Fetch the user's current points
-      const [userResult] = await conn.query(`SELECT karigerPoints  FROM users WHERE id = ?`, [user_id]);
+      const [userResult] = await conn.query(
+        `SELECT karigerPoints FROM users WHERE id = ?`,
+        [user_id]
+      );
 
       if (userResult.length === 0) {
         return res.status(404).json({ error: "User not found" });
       }
 
-      const currentPoints = userResult[0].points;
-
-      // Assuming each redeem request costs some points (replace with your logic)
-      const pointsToDeduct = 10;  // Example: 10 points for each redeem request
+      const currentPoints = userResult[0].karigerPoints;
+      const pointsToDeduct = 10;
 
       if (currentPoints < pointsToDeduct) {
         return res.status(400).json({ error: "Insufficient points" });
       }
 
-      // Deduct points from the user's account
       await conn.execute(
-        `UPDATE users SET karigerPoints  = karigerPoints  - ? WHERE id = ?`,
+        `UPDATE users SET karigerPoints = karigerPoints - ? WHERE id = ?`,
         [pointsToDeduct, user_id]
       );
     }
 
-    conn.release();
-
-    // Send success response
-    res.status(201).json({ message: "Redeem request created, points deducted", id: result.insertId });
+    res.status(201).json({
+      message: "Redeem request created, points deducted",
+      request_id: requestId, // Returning the generated request_id
+      id: insertedId,
+    });
   } catch (err) {
     console.error("DB Error:", err);
+    res.status(500).json({ error: "Database error" });
+  } finally {
     conn.release();
+  }
+});
+
+
+// get redeem request list
+export const getRedeemRequestList = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const offset = (page - 1) * limit;
+
+  try {
+    // Fetch redeem requests along with associated user data
+    const [redeemRequests] = await pool.query(
+      `SELECT rr.*,  u.email as email, u.karigerPoints as karigerPoints, u.state as state, u.city as city
+       FROM redeemrequest rr
+       LEFT JOIN users u ON rr.user_id = u.id
+       ORDER BY rr.id DESC
+       LIMIT ? OFFSET ?`,
+      [limit, offset]
+    );
+
+    // Get total count for pagination
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) AS total FROM redeemrequest`
+    );
+
+    res.status(200).json({
+      data: redeemRequests.map((item) => ({
+        ...item,
+        user: {
+          id: item.user_id,
+          name: item.fullName,
+          email: item.email,
+          karigerPoints: item.karigerPoints,
+          state: item.state,
+          district: item.city,
+          account_status: item.account_status || null,
+        },
+      })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error("DB Error:", err);
     res.status(500).json({ error: "Database error" });
   }
 });
+
+
+
+
 
 
 export const cancelRedeemRequest = asyncHandler(async (req, res) => {
@@ -98,7 +162,7 @@ export const cancelRedeemRequest = asyncHandler(async (req, res) => {
 
   try {
     // Step 1: Fetch the redeem request by ID
-    const [redeemRequest] = await conn.query(
+    const [redeemRequest] = await pool.query(
       `SELECT * FROM redeemRequest WHERE id = ?`,
       [redeemRequestId]
     );
@@ -115,7 +179,7 @@ export const cancelRedeemRequest = asyncHandler(async (req, res) => {
     }
 
     // Step 3: Get the user's karigerPoints  before cancelling the redeem request
-    const [userResult] = await conn.query(
+    const [userResult] = await pool.query(
       `SELECT karigerPoints  FROM users WHERE id = ?`,
       [request.user_id]
     );
@@ -130,18 +194,18 @@ export const cancelRedeemRequest = asyncHandler(async (req, res) => {
     const karigerPointsToRefund = 10;
 
     // Step 4: Refund karigerPoints  to the user
-    await conn.execute(
+    await pool.execute(
       `UPDATE users SET karigerPoints  = karigerPoints  + ? WHERE id = ?`,
       [karigerPointsToRefund, request.user_id]
     );
 
     // Step 5: Mark the redeem request as cancelled
-    await conn.execute(
+    await pool.execute(
       `UPDATE redeemRequest SET is_cancellation = TRUE WHERE id = ?`,
       [redeemRequestId]
     );
 
-    conn.release();
+    
 
     // Step 6: Respond with a success message
     res.status(200).json({
@@ -149,7 +213,7 @@ export const cancelRedeemRequest = asyncHandler(async (req, res) => {
     });
   } catch (err) {
     console.error("DB Error:", err);
-    conn.release();
+    
     res.status(500).json({ error: "Database error" });
   }
 });
