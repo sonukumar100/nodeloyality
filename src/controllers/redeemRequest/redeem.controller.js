@@ -104,15 +104,21 @@ export const getRedeemRequestList = asyncHandler(async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-    // Fetch redeem requests along with associated user data
+    // Join users, offers, and gifts
     const [redeemRequests] = await pool.query(
-      `SELECT rr.*,  u.email as email, u.karigerPoints as karigerPoints, u.state as state, u.city as city
+      `SELECT rr.*, 
+              u.email AS email, u.karigerPoints AS karigerPoints, u.state AS state, u.city AS city,
+              o.id AS offer_id, o.end_date AS offer_end_date,
+              g.id AS gift_id, g.giftTitle AS gift_name, g.giftType AS gift_type, g.points AS points
        FROM redeemrequest rr
        LEFT JOIN users u ON rr.user_id = u.id
+       LEFT JOIN offers o ON rr.offer_id = o.id
+       LEFT JOIN gifts g ON rr.gift_id = g.id
        ORDER BY rr.id DESC
        LIMIT ? OFFSET ?`,
       [limit, offset]
     );
+    
 
     // Get total count for pagination
     const [[{ total }]] = await pool.query(
@@ -126,10 +132,20 @@ export const getRedeemRequestList = asyncHandler(async (req, res) => {
           id: item.user_id,
           name: item.fullName,
           email: item.email,
-          karigerPoints: item.karigerPoints,
+          karigerPoints: item.karikerPoints,
           state: item.state,
           district: item.city,
           account_status: item.account_status || null,
+        },
+        offer: {
+          id: item.offer_id,
+          end_date: item.offer_end_date,
+        },
+        gift: {
+          id: item.gift_id,
+          gift_name: item.gift_name,
+          type: item.gift_type,
+          points: item.points,
         },
       })),
       pagination: {
@@ -144,6 +160,8 @@ export const getRedeemRequestList = asyncHandler(async (req, res) => {
     res.status(500).json({ error: "Database error" });
   }
 });
+
+
 
 
 

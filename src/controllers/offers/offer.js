@@ -16,25 +16,34 @@ export const createOffer = asyncHandler(async (req, res) => {
     districts,
     gifts
   } = req.body;
+
   const offerImage = req.files?.offerImage?.[0]?.path;
+
   if (!offerImage) {
-      return res.status(400).json({ message: 'offerImage image is required' });
+    return res.status(400).json({ message: 'offerImage image is required' });
   }
+
   const url = await uploadOnCloudinary(offerImage);
+
   if (!url) {
-      return res.status(400).json({ message: 'File upload failed' });
+    return res.status(400).json({ message: 'File upload failed' });
   }
+
+  const parsedGifts = typeof gifts === 'string' ? JSON.parse(gifts) : gifts;
+  const parsedStates = typeof states === 'string' ? JSON.parse(states) : states;
+  const parsedDistricts = typeof districts === 'string' ? JSON.parse(districts) : districts;
+
   const insertQuery = `
     INSERT INTO offers (
       user_type, title, offer_code, description, terms_conditions,
-      start_date, end_date, states, districts, gifts,url
+      start_date, end_date, states, districts, gifts, url
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
-console.log("File URL: ",url.secure_url || url.url);
+
   try {
     const conn = await pool.getConnection();
 
-    await pool.query(insertQuery, [
+    await conn.query(insertQuery, [
       user_type,
       title,
       offer_code,
@@ -42,14 +51,12 @@ console.log("File URL: ",url.secure_url || url.url);
       terms_conditions,
       start_date,
       end_date,
-      JSON.stringify(states),
-      JSON.stringify(districts),
-      JSON.stringify(gifts),
+      JSON.stringify(parsedStates),
+      JSON.stringify(parsedDistricts),
+      JSON.stringify(parsedGifts),
       url.secure_url || url.url,
-
     ]);
 
-  
     res.status(201).json({ message: 'Offer created successfully.' });
 
   } catch (error) {
@@ -57,6 +64,7 @@ console.log("File URL: ",url.secure_url || url.url);
     res.status(500).json({ message: 'Failed to create offer', error });
   }
 });
+
 function doubleParse(jsonStr, fallback = []) {
   try {
     const once = JSON.parse(jsonStr);
@@ -74,6 +82,7 @@ export const getOffers = async (req, res) => {
   const userState = req.query.state?.toLowerCase();
   const userDistrict = req.query.district?.toLowerCase();
   const offerStatus = req.query.offerStatus; // '0' or '1'
+  const isExport = req.query.export === 'true';
 
   function safeJsonParse(jsonStr, fallback = []) {
     try {
@@ -95,8 +104,6 @@ export const getOffers = async (req, res) => {
   }
 
   try {
-    // const conn = await pool.getConnection();
-
     const [offers] = await pool.query(`SELECT * FROM offers ORDER BY created_at DESC`);
 
     const parsedOffers = offers.map(offer => {
@@ -109,6 +116,7 @@ export const getOffers = async (req, res) => {
     });
 
     const filteredOffers = parsedOffers.filter(offer => {
+      console.log('offer:', offer);
       const stateMatch =
         !userState ||
         offer.states.length === 0 ||
@@ -125,7 +133,7 @@ export const getOffers = async (req, res) => {
       return stateMatch && districtMatch && statusMatch;
     });
 
-    // Count redeemRequest for each gift
+    // Add redeemCount for each gift
     for (const offer of filteredOffers) {
       if (!Array.isArray(offer.gifts)) offer.gifts = [];
 
@@ -141,14 +149,15 @@ export const getOffers = async (req, res) => {
       }
     }
 
-  
-
-    const paginatedOffers = filteredOffers.slice(offset, offset + limit);
     const totalActive = parsedOffers.filter(o => o.offerStatus === 1).length;
     const totalInactive = parsedOffers.filter(o => o.offerStatus === 0).length;
 
+    const responseData = isExport
+      ? filteredOffers // return all for export
+      : filteredOffers.slice(offset, offset + limit); // paginated for normal view
+
     res.status(200).json({
-      data: paginatedOffers,
+      data: responseData,
       pagination: {
         total: filteredOffers.length,
         page,
@@ -156,6 +165,7 @@ export const getOffers = async (req, res) => {
         totalPages: Math.ceil(filteredOffers.length / limit),
         totalActive,
         totalInactive,
+        isExport,
       },
     });
   } catch (error) {
@@ -163,6 +173,7 @@ export const getOffers = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch offers', error });
   }
 };
+
 
 
 
