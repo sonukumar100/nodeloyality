@@ -85,46 +85,52 @@ export const getOffers = async (req, res) => {
     }
   }
 
+  function doubleParse(jsonStr) {
+    try {
+      const parsed = JSON.parse(jsonStr);
+      return Array.isArray(parsed) ? parsed : safeJsonParse(parsed);
+    } catch (err) {
+      return safeJsonParse(jsonStr);
+    }
+  }
+
   try {
     const conn = await pool.getConnection();
 
-    // Fetch offers from database
     const [offers] = await conn.query(`SELECT * FROM offers ORDER BY created_at DESC`);
 
-    // Parse JSON fields
     const parsedOffers = offers.map(offer => {
-      // Logging for debugging
-      // console.log('Raw states:', offer.states);
-      // console.log('Raw districts:', offer.districts);
       return {
         ...offer,
         states: doubleParse(offer.states),
         districts: doubleParse(offer.districts),
-        gifts: safeJsonParse(offer.gifts),
+        gifts: doubleParse(offer.gifts),
       };
     });
 
-    // Filter offers by state, district, and offerStatus
-    console.log('Parsed offers:', parsedOffers);
     const filteredOffers = parsedOffers.filter(offer => {
-      // Match states
-      const stateMatch = !userState || offer.states.length === 0 ||
+      const stateMatch =
+        !userState ||
+        offer.states.length === 0 ||
         offer.states.some(stateObj => stateObj.label?.toLowerCase() === userState);
 
-      // Match districts
-      const districtMatch = !userDistrict || offer.districts.length === 0 ||
+      const districtMatch =
+        !userDistrict ||
+        offer.districts.length === 0 ||
         offer.districts.some(distObj => distObj.label?.toLowerCase() === userDistrict);
 
-      // Match offerStatus
-      const statusMatch = offerStatus === undefined || String(offer.offerStatus) === offerStatus;
+      const statusMatch =
+        offerStatus === undefined || String(offer.offerStatus) === offerStatus;
 
       return stateMatch && districtMatch && statusMatch;
     });
 
     // Count redeemRequest for each gift
     for (const offer of filteredOffers) {
+      if (!Array.isArray(offer.gifts)) offer.gifts = [];
+
       for (const gift of offer.gifts) {
-        if (offer.gifts.length === 0) continue;
+        if (!gift?.id) continue;
 
         const [rows] = await conn.query(
           `SELECT COUNT(*) AS count FROM redeemRequest WHERE offer_id = ? AND gift_id = ? AND is_cancellation = FALSE`,
@@ -135,14 +141,12 @@ export const getOffers = async (req, res) => {
       }
     }
 
-    // Release connection
     conn.release();
 
-    // Paginate filtered offers
     const paginatedOffers = filteredOffers.slice(offset, offset + limit);
     const totalActive = parsedOffers.filter(o => o.offerStatus === 1).length;
     const totalInactive = parsedOffers.filter(o => o.offerStatus === 0).length;
-    // Return paginated response with pagination metadata
+
     res.status(200).json({
       data: paginatedOffers,
       pagination: {
@@ -159,6 +163,7 @@ export const getOffers = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch offers', error });
   }
 };
+
 
 
 

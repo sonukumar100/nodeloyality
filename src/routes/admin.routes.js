@@ -10,7 +10,7 @@ import { addAccessLimit } from "../controllers/master/dailyCouponAccess.js";
 import { addOrUpdateVideo, deleteVideo, getAllVideos } from "../controllers/master/addVideo.controller.js";
 import { addCatalogItem, deleteCatalogItem, editCatalogItem, listCatalogItems } from "../controllers/master/catalog.controller.js";
 import { createOffer, getOfferGifts, getOffers, updateOffer, updateOfferStatus } from "../controllers/offers/offer.js";
-import { addGiftGallery, giftGalleryList, updateGift } from "../controllers/master/addGift.controller.js";
+import { addGiftGallery, deleteGift, giftGalleryList, updateGift } from "../controllers/master/addGift.controller.js";
 
 const router = Router();
 // router.route('/add-gift').post( upload.fields([
@@ -88,7 +88,7 @@ router.route('/update-gift-gallery').post( upload.fields([
     maxCount: 1,
   },
 ]),updateGift);
-// router.route('/delete-gift/:id').delete(deleteGift);
+router.route('/delete-gift-gallery/:id').delete(deleteGift);
 router.route('/gift-gallery-list').get(giftGalleryList);
 
 
