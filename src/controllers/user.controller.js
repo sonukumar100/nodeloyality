@@ -35,98 +35,91 @@ console.log("userId",userId);
 
 //User Registration Controller
 const registerUser = asyncHandler(async (req, res) => {
-  // get user details from frontend
-  // validation - not empty
-  // check if user already exists: username, email
-  // check for images, check for avatar
-  // upload them to cloudinary, avatar
-  // create user object - create entry in db
-  // remove password and refresh token field from response
-  // check for user creation
-  // return res
-  const { username, email, password, fullName,state,city,address,whatsapp,datOfBirth,referralCode,zipcode } = req.body;
-  if (
-    [ email, fullName].some((field) => field?.trim() === "")
-  ) {
-    throw new ApiError(400, "All fields are required!");
+  const {
+    type,
+   
+    full_name,
+    state,
+    city,
+    address,
+    whatsapp,
+    dateOfBirth,
+    referralCode,
+    mobile_number,
+    zipcode,
+    email,
+  } = req.body;
+
+  if ([email, full_name].some((field) => field?.trim() === "")) {
+    return res.status(400).send("All fields are required!");
   }
 
-  const existedUser = await User.findOne({
-    $or: [{ email: email }],
-  });
-  if (existedUser?.email !== email) {
-    throw new ApiError(409, "User with email or username not exists!");
+  try {
+    const [existingUser] = await pool.query(
+      "SELECT * FROM users WHERE email = ?",
+      [email]
+    );
+
+    if (existingUser.length === 0) {
+      return res.status(409).send("User with email does not exist!");
+    }
+
+    const aadhaarBackPath = req.files?.aadhaarBack?.[0]?.path;
+    const aadhaarFrontPath = req.files?.aadhaarFront?.[0]?.path;
+
+    const backImg = await uploadOnCloudinary(aadhaarBackPath);
+    const frontImg = await uploadOnCloudinary(aadhaarFrontPath);
+
+    let coverImageUrl = null;
+    if (req.files?.coverImage?.[0]?.path) {
+      const cover = await uploadOnCloudinary(req.files.coverImage[0].path);
+      coverImageUrl = cover?.url;
+    }
+
+    await pool.query(
+      `UPDATE users SET 
+        type = ?, full_name = ?, state = ?, city = ?, address = ?, whatsapp = ?, 
+        dateOfBirth = ?, referralCode = ?, zipcode = ?, aadhaarBack = ?, aadhaarFront = ?, 
+        coverImage = ?, mobile_number = ?, updatedAt = NOW()
+      WHERE email = ?`,
+      [
+        type,
+        full_name,
+        state,
+        city,
+        address,
+        whatsapp,
+        dateOfBirth,
+        referralCode,
+        zipcode,
+        backImg?.url,
+        frontImg?.url,
+        coverImageUrl,
+        mobile_number,
+        email,
+      ]
+    );
+
+    const [updatedUser] = await pool.query(
+      "SELECT *  FROM users WHERE email = ?",
+      [email]
+    );
+
+    const token = generateAccessToken(updatedUser[0]);
+
+    return res
+      .status(201)
+      .json(new ApiResponse(200, updatedUser[0], { token }, "User registered successfully"));
+  } catch (error) {
+    console.error("Registration Error:", error);
+    return res.status(500).send(
+      `<pre>Error: Something went wrong during registration.<br>${error.stack.replace(/\n/g, "<br>").replace(/  /g, "&nbsp;&nbsp;")}</pre>`
+    );
   }
-  console.log("state===>",state);
-  // if(!state  || !city  || !address || !whatsapp  || !datOfBirth  || !zipcode === ""){
-  //   throw new ApiError(400, "All fields are required!");
-  // }
-  const aadhaarBack = req.files?.aadhaarBack?.[0]?.path;
-  const aadhaarFront = req.files?.aadhaarFront?.[0]?.path;
+});
 
 
-  // let coverImageLocalPath;
-  // if (
-  //   req.files &&
-  //   Array.isArray(req.files.coverImage) &&
-  //   req.files.coverImage.length > 0
-  // ) {
-  //   coverImageLocalPath = req.files.coverImage[0].path;
-  // }
-  // const coverImageLocalPath = req.file.coverImage[ 0 ]?.path
-  
-  // if (!aadhaarBack) {
-  //   throw new ApiError(400, "AadhaarBack image is required!");
-  // }
-  // if (!aadhaarFront) {
-  //   throw new ApiError(400, "AadhaarFront front image is required!");
-  // }
-  
 
-  const backImg = await uploadOnCloudinary(aadhaarBack);
-  const frontImg = await uploadOnCloudinary(aadhaarFront);
-
-  // if (!backImg) {
-  //   console.error("backImg upload to Cloudinary failed:", avatar);
-  //   throw new ApiError(400, "backImg file is required!");
-  // }
-  
-
-  const user = await User.findOneAndUpdate(
-    { email },  // The condition to find the user
-    {
-      type,
-      fullName,
-      state,city,address,whatsapp,datOfBirth,referralCode,zipcode,
-      aadhaarBack: backImg.url,
-      aadhaarFront: frontImg.url,
-      coverImage: coverImage.url,
-      state,
-      city,
-      address,
-      whatsapp,
-      datOfBirth,
-      referralCode,
-      zipcode,
-      email,
-      isTrue: true,
-      updatedAt: new Date(),  // Update timestamp if needed
-    },
-    { new: true }  // Returns the updated document
-  );
-
-  // const createdUser = await User.findById(user._id).select(
-  //   "-password -refreshToken"
-  // );
-
-  // if (!createdUser) {
-  //   throw new ApiError(500, "Something went wrong while registering user!");
-  // }
- const token  = generateAccessToken(user);
-  return res
-    .status(201)
-    .json(new ApiResponse(200,user,{token:token},  "User registered Successfully"));
-})
 
 
 //User Login Controller
@@ -312,9 +305,9 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 
 //Update Account Details Controller
 const updateAccountDetails = asyncHandler(async (req, res) => {
-  const { fullName, username } = req.body;
+  const { full_name, username } = req.body;
 
-  if (!username || !fullName) {
+  if (!username || !full_name) {
     throw new ApiError(400, "Username or full name is required");
   }
 
@@ -322,7 +315,7 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
     req.user?._id,
     {
       $set: {
-        fullName,
+        full_name,
         username: username.toLowerCase()
       }
     }
@@ -445,6 +438,7 @@ const verifyOtp = asyncHandler(async (req, res) => {
     );
 
     const user = results[0];
+    console.log("user", user);
 
     if (!user) {
       throw new ApiError(400, "Invalid or expired OTP");
