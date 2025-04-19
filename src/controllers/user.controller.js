@@ -117,6 +117,90 @@ const registerUser = asyncHandler(async (req, res) => {
     );
   }
 });
+//// verify users ///
+const verifyUser = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  console.log("id", id);
+
+  try {
+    const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
+console.log("rows",rows);
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const user = rows[0];
+
+
+    // Optionally check if the user is active
+    if (!user.isActive) {
+      await pool.query("UPDATE users SET isActive = 1 WHERE id = ?", [user.id]);
+      return res.status(200).json(new ApiResponse(200,  "User verified successfully!"));
+    }
+
+    res.status(200).json({ message: 'User verified', user });
+  } catch (error) {
+    console.error('Verify user error:', error);
+    res.status(500).json({ message: 'Something went wrong' });
+  }
+});
+/// delete user ///
+const deleteUser = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  console.log("id", id);
+  try {
+    const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);  
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    const user = rows[0];
+    console.log("user", user);  
+    // Optionally check if the user is active
+    if (!user.is_deleted) {
+      await pool.query("UPDATE users SET is_deleted = 1 WHERE id = ?", [user.id]);
+      return res.status(200).json(new ApiResponse(200, "User deleted successfully!"));
+    }
+    res.status(200).json({ message: 'User deleted', user });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ message: 'Something went wrong' });
+  }
+});  
+/// get all users ///
+const getAllUsers = asyncHandler(async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM users WHERE is_deleted = 0');  
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'No users found' });
+    }
+    res.status(200).json({ message: 'Users fetched successfully', users: rows });
+  } catch (error) {
+    console.error('Get all users error:', error);
+    res.status(500).json({ message: 'Something went wrong' });
+  }
+
+});
+/// get users by id ///
+const getUserById = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  console.log("id", id);
+  try {
+    const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
+    if (rows.length === 0) {
+
+      return res.status(404).json({ message: 'User not found' });
+    }
+    const user = rows[0];
+    console.log("user", user);
+    res.status(200).json({ message: 'User fetched successfully', user });
+  } catch (error) {
+    console.error('Get user by ID error:', error);
+    res.status(500).json({ message: 'Something went wrong' });
+  }
+});
+
+
+
 
 
 
@@ -505,5 +589,9 @@ export {
   updateUserCoverImage,
   sendOtp,
   verifyOtp,
-  resendOtp
+  resendOtp,
+  verifyUser,
+  deleteUser,
+  getAllUsers,
+  getUserById,
 };

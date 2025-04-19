@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { changeCurrentPassword, getCurrentUser, loginUser, logoutUser, refreshAccessToken, registerUser, resendOtp, sendOtp, updateAccountDetails, updateUserAvatar, updateUserCoverImage, verifyOtp } from "../controllers/user.controller.js";
+import { changeCurrentPassword, deleteUser, getAllUsers, getCurrentUser, loginUser, logoutUser, refreshAccessToken, registerUser, resendOtp, sendOtp, updateAccountDetails, updateUserAvatar, updateUserCoverImage, verifyOtp, verifyUser } from "../controllers/user.controller.js";
 import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJwt } from "../middlewares/auth.middleware.js";
 import { getFilteredCoupons } from "../controllers/generateCoupon.controller.js";
@@ -35,6 +35,12 @@ router.route('/scan-qr-code').post(scanCoupon)
 router.route("/coupon/list").get(getFilteredCoupons);
 router.route('/redeem-request').post(RedeemRequest);
 router.route('/redeem-request/cancel').post(cancelRedeemRequest);
+router.route('/verify-user/:id').put(verifyUser);
+router.route('/delete-user/:id').delete(deleteUser);
+
+
+
+
 
 
 
