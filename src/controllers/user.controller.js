@@ -47,6 +47,7 @@ const registerUser = asyncHandler(async (req, res) => {
     referralCode,
     mobile_number,
     zipcode,
+    isTrue,
     email,
   } = req.body;
 
@@ -79,7 +80,7 @@ const registerUser = asyncHandler(async (req, res) => {
     await pool.query(
       `UPDATE users SET 
         type = ?, full_name = ?, state = ?, city = ?, address = ?, whatsapp = ?, 
-        dateOfBirth = ?, referralCode = ?, zipcode = ?, aadhaarBack = ?, aadhaarFront = ?, 
+        dateOfBirth = ?, referralCode = ?, zipcode = ?, aadhaarBack = ?, isTrue = ?, aadhaarFront = ?, 
         coverImage = ?, mobile_number = ?, updatedAt = NOW()
       WHERE email = ?`,
       [
@@ -93,17 +94,20 @@ const registerUser = asyncHandler(async (req, res) => {
         referralCode,
         zipcode,
         backImg?.url,
+        1, // <-- isTrue is always set to 1
         frontImg?.url,
         coverImageUrl,
         mobile_number,
         email,
       ]
     );
+    
 
     const [updatedUser] = await pool.query(
       "SELECT *  FROM users WHERE email = ?",
       [email]
     );
+    
 
     const token = generateAccessToken(updatedUser[0]);
 
@@ -492,7 +496,7 @@ if (results.length > 0) {
     [otp, otpExpireTime, userId]
   );
   await sendEmail(email, otp);
-  return res.status(200).json(new ApiResponse(200, email, "OTP sent successfully!"));
+  return res.status(200).json(new ApiResponse(200, email,otp, "OTP sent successfully!"));
 } else {
   await pool.execute(
     "INSERT INTO users (email, otp, otpExpireTime) VALUES (?, ?, ?)",
@@ -502,7 +506,7 @@ if (results.length > 0) {
   console.log("-new user added and otp sent:", otp);
   await sendEmail(email, otp);
 
-  return res.status(200).json(new ApiResponse(200, email, "OTP sent successfully!"));
+  return res.status(200).json(new ApiResponse(200, email,otp, "OTP sent successfully!"));
 }
       });
 /// verify otp ///
@@ -539,7 +543,7 @@ const verifyOtp = asyncHandler(async (req, res) => {
     const token = generateAccessToken(user);
     return res
       .status(200)
-      .json(new ApiResponse(200, user, { token }, "Otp verified successfully!"));
+      .json(new ApiResponse(200, {...user,token}, "Otp verified successfully!"));
   } catch (error) {
     throw new ApiError(500, "Database error: " + error.message);
   }

@@ -13,7 +13,7 @@ import nodemailer from "nodemailer";
       // send mail with defined transport object
       const info = await transporter.sendMail({
         from: '"Sonu Kumar 👻" <sk.kumar78408@gmail.com>', // sender address
-        to: 'sonu.k@appening.xyz', // send to the dynamic email provided
+        to: email, // send to the dynamic email provided
         subject: 'Welcome to Our Platform!',
         text: `Hello ${otp},
     
