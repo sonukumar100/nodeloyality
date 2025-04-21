@@ -66,7 +66,6 @@ const scanCoupon = asyncHandler(async (req, res) => {
   }
 
   try {
-    // 1. Check if the coupon exists
     const [rows] = await pool.execute(
       "SELECT * FROM coupons WHERE couponCode = ? LIMIT 1",
       [couponCode]
@@ -81,10 +80,7 @@ const scanCoupon = asyncHandler(async (req, res) => {
     if (coupon.flag === 1) {
       return res.status(400).json(new ApiResponse(400, coupon, "Coupon already used"));
     }
-  
 
-
-    // 2. Get user
     const [userRows] = await pool.execute(
       "SELECT * FROM users WHERE id = ? LIMIT 1",
       [user_id]
@@ -95,57 +91,57 @@ const scanCoupon = asyncHandler(async (req, res) => {
     if (!user) {
       return res.status(404).json(new ApiResponse(404, null, "User not found"));
     }
+
     const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0); // midnight today
-    
+    todayStart.setHours(0, 0, 0, 0);
+
     const [scanCountRows] = await pool.execute(
       `SELECT COUNT(*) as scanCount FROM coupons 
        WHERE JSON_EXTRACT(user, '$.id') = ? AND flag = 1 AND updatedAt >= ?`,
       [user.id, todayStart.toISOString()]
     );
-    
+
     const scanCount = scanCountRows[0].scanCount;
+
     const [limitRows] = await pool.execute(
       "SELECT accessLimit FROM dailyaccesslimit LIMIT 1"
     );
-    const accessLimit = limitRows[0]?.accessLimit 
+
+    const accessLimit = limitRows[0]?.accessLimit;
     if (scanCount >= accessLimit) {
       return res.status(400).json(
         new ApiResponse(400, null, "Daily scan limit of 5 coupons reached.")
       );
     }
-    
 
-    // 3. Assign points based on coupon type
     let newKarigerPoints = user.karigerPoints || 0;
     let newDealerPoints = user.dealerPoints || 0;
 
+    let earnedPoints = 0;
+
     if (user.type === "kariger") {
-      newKarigerPoints += coupon.karigerPoints || 0;
+      earnedPoints = coupon.karigerPoints || 0;
+      newKarigerPoints += earnedPoints;
     } else if (coupon.type === "dealer") {
-      newDealerPoints += coupon.dealerPoints || 0;
+      earnedPoints = coupon.dealerPoints || 0;
+      newDealerPoints += earnedPoints;
     }
 
-    // 4. Update user points
     await pool.execute(
       "UPDATE users SET karigerPoints = ?, dealerPoints = ?, updatedAt = NOW() WHERE id = ?",
       [newKarigerPoints, newDealerPoints, user_id]
     );
 
-    // 5. Update coupon as used
     await pool.execute(
       "UPDATE coupons SET flag = 1, updatedAt = NOW(), user = ? WHERE id = ?",
       [
         JSON.stringify({
-          ...user
-
-            // optional, if useful
+          ...user,
         }),
         coupon.id
       ]
     );
 
-    // 6. Return updated info
     const [updatedUser] = await pool.execute(
       "SELECT * FROM users WHERE id = ?",
       [user_id]
@@ -154,12 +150,14 @@ const scanCoupon = asyncHandler(async (req, res) => {
     return res.status(200).json(
       new ApiResponse(200, {
         updatedUser: updatedUser[0],
-      }, "Coupon scanned and points updated successfully")
+        earnedPoints,
+      }, `Coupon scanned. ${earnedPoints} points added successfully.`)
     );
   } catch (error) {
     throw new ApiError(500, "Database error: " + error.message);
   }
 });
+
   
 const getFilteredCoupons = asyncHandler(async (req, res) => {
   const { filter, couponGroup } = req.query;

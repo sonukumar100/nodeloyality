@@ -79,10 +79,13 @@ export const getOffers = async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
   const offset = (page - 1) * limit;
 
-  const userState = req.query.state?.toLowerCase();
-  const userDistrict = req.query.district?.toLowerCase();
   const offerStatus = req.query.offerStatus; // '0' or '1'
   const isExport = req.query.export === 'true';
+
+  const userId = req.query.user_id;
+
+  let userState = req.query.state?.toLowerCase();
+  let userDistrict = req.query.district?.toLowerCase();
 
   function safeJsonParse(jsonStr, fallback = []) {
     try {
@@ -104,6 +107,21 @@ export const getOffers = async (req, res) => {
   }
 
   try {
+    // If user_id is provided, fetch user's state and district
+    if (userId) {
+      const [userResult] = await pool.query(
+        `SELECT state, city FROM users WHERE id = ?`,
+        [userId]
+      );
+
+      const user = userResult[0];
+      if (user) {
+        userState = user.state
+        userDistrict = user.city
+      }
+    }
+
+
     const [offers] = await pool.query(`SELECT * FROM offers ORDER BY created_at DESC`);
 
     const parsedOffers = offers.map(offer => {
@@ -116,22 +134,26 @@ export const getOffers = async (req, res) => {
     });
 
     const filteredOffers = parsedOffers.filter(offer => {
-      console.log('offer:', offer);
+      // console.log('Offer:', offer);
+      
+      console.log('User State:', userState);
+      console.log('User District:', userDistrict);
       const stateMatch =
         !userState ||
         offer.states.length === 0 ||
-        offer.states.some(stateObj => stateObj.label?.toLowerCase() === userState);
+        offer.states.some(stateObj => stateObj.value === userState);
 
       const districtMatch =
         !userDistrict ||
         offer.districts.length === 0 ||
-        offer.districts.some(distObj => distObj.label?.toLowerCase() === userDistrict);
+        offer.districts.some(distObj => distObj.value === userDistrict);
 
       const statusMatch =
         offerStatus === undefined || String(offer.offerStatus) === offerStatus;
 
       return stateMatch && districtMatch && statusMatch;
     });
+
 
     // Add redeemCount for each gift
     for (const offer of filteredOffers) {
@@ -173,6 +195,7 @@ export const getOffers = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch offers', error });
   }
 };
+
 
 
 
