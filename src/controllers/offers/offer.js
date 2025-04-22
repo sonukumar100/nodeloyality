@@ -315,6 +315,8 @@ export const getOfferGifts = async (req, res) => {
 
     // Convert array of strings to array of objects
     if (Array.isArray(gifts) && typeof gifts[0] === 'string') {
+      console.log('gifts:sssssssssssssssssss', gifts),
+
       gifts = gifts.map((title, index) => ({
         id: index + 1,
         title,

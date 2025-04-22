@@ -160,22 +160,27 @@ const scanCoupon = asyncHandler(async (req, res) => {
 
   
 const getFilteredCoupons = asyncHandler(async (req, res) => {
-  const { filter, couponGroup } = req.query;
+  const { filter, couponGroup, userId } = req.query;
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
   const offset = (page - 1) * limit;
 
-  let filterCondition = "";
+  let filterCondition = " WHERE 1=1";
   let queryParams = [];
   let fetchCoupons = true;
 
   if (filter === "scanned") {
-    filterCondition = " WHERE flag = 1";
+    filterCondition += " AND flag = 1";
+
+    if (userId) {
+      filterCondition += " AND JSON_EXTRACT(user, '$.id') = ?";
+      queryParams.push(userId);
+    }
   } else if (filter === "available") {
-    filterCondition = " WHERE flag = 0";
+    filterCondition += " AND flag = 0";
   } else if (filter === "group") {
     if (couponGroup) {
-      filterCondition = " WHERE couponGroup = ?";
+      filterCondition += " AND couponGroup = ?";
       queryParams.push(couponGroup);
     } else {
       fetchCoupons = false;
@@ -280,7 +285,6 @@ const getFilteredCoupons = asyncHandler(async (req, res) => {
     };
 
     if (filter === "group" && !couponGroup) {
-      // Only group summary returned
       response.data = groupInfo || [];
     } else {
       response.data = parsedCoupons;
@@ -307,6 +311,7 @@ const getFilteredCoupons = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Database error: " + error.message);
   }
 });
+
 
 
 
