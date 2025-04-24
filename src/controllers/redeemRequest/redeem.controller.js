@@ -3,65 +3,117 @@ import { pool } from '../../db/index.js';
 
 
 export const RedeemRequest = asyncHandler(async (req, res) => {
+  function doubleParse(jsonStr, fallback = []) {
+    try {
+      const once = JSON.parse(jsonStr);
+      return Array.isArray(once) ? once : JSON.parse(once);
+    } catch (err) {
+      console.warn('Failed to double-parse JSON:', jsonStr);
+      return fallback;
+    }
+  }
+
   const {
     otp,
-    same_permanment_address,
     shipping_address,
-    cancelation_policy,
     user_id,
     offer_id,
     gift_id,
-    is_cancellation,
+    bank_name,
+    account_number,
+    ifsc_code,
+    description,
+    gift_type,
+    account_holder_name
   } = req.body;
 
+//  get userdata
+  const userId = req.query.user_id;
+  const userData = await pool.query(
+    `SELECT state, city FROM users WHERE id = ?`,
+    [userId]
+  );
+  const user = userData[0][0];
+  console.log(user);
+
+  if(userData.otp !== otp){
+    return res.status(400).json({ message: "Invalid OTP" });
+  }
+  // Basic required fields
   if (
     !otp ||
-    typeof same_permanment_address !== "boolean" ||
-    !shipping_address ||
-    !cancelation_policy ||
     !user_id ||
     !offer_id ||
     !gift_id ||
-    typeof is_cancellation !== "boolean"
+    !gift_type
   ) {
-    return res.status(400).json({ error: "All fields are required and must be valid." });
+    return res.status(400).json({ error: "OTP, user ID, offer ID, gift ID and gift type are required." });
   }
 
-  const conn = await pool.getConnection();
+  // Require shipping address only if gift_type is 'Gift'
+  if (gift_type === 'Gift' && !shipping_address) {
+    return res.status(400).json({ error: "Shipping address is required for gift-type redemptions." });
+  }
+
+  // Optional: require bank info if gift_type is 'Cash'
+  // if (gift_type === 'Cash' && (!bank_name || !account_number || !ifsc_code)) {
+  //   return res.status(400).json({ error: "Bank details are required for cash-type redemptions." });
+  // }
 
   try {
-    // Step 1: Insert redeem request without request_id
-    const [result] = await conn.execute(
-      `INSERT INTO redeemRequest (
-        otp, same_permanment_address, shipping_address, cancelation_policy,
-        user_id, offer_id, gift_id, is_cancellation
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        otp,
-        same_permanment_address,
-        shipping_address,
-        cancelation_policy,
-        user_id,
-        offer_id,
-        gift_id,
-        is_cancellation,
-      ]
-    );
-
-    const insertedId = result.insertId;
+    const [result] =  await pool.execute(
+  `INSERT INTO redeemrequest (
+    otp, shipping_address, user_id, offer_id, gift_id, bank_name,
+    account_number, ifsc_code, description, gift_type,account_holder_name
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  [
+    otp ?? null,
+    gift_type === 'Gift' ? shipping_address : "",
+    user_id ?? null,
+    offer_id ?? null,
+    gift_id ?? null,
+    bank_name ?? null,
+    account_number ?? null,
+    ifsc_code ?? null,
+    description ?? null,
+    gift_type ?? null,
+    account_holder_name ?? null
+  ]
+);
 
     // Step 2: Generate the request_id like "R0000001"
+   
+
+
+    const insertedId = result.insertId;
     const requestId = `R${String(insertedId).padStart(7, "0")}`;
 
-    // Step 3: Update the request_id in the database immediately after insert
-    await conn.execute(
-      `UPDATE redeemRequest SET request_id = ? WHERE id = ?`,
+    await pool.execute(
+      `UPDATE redeemrequest SET request_id = ? WHERE id = ?`,
       [requestId, insertedId]
     );
 
-    // Step 4: Deduct points if not a cancellation
+    // Deduct points only if not a cancellation
+    const is_cancellation = false;
+
     if (!is_cancellation) {
-      const [userResult] = await conn.query(
+      const [offerResult] = await pool.query(
+        `SELECT gifts FROM offers WHERE id = ?`,
+        [offer_id]
+      );
+
+      if (offerResult.length === 0) {
+        return res.status(404).json({ error: "Offer not found" });
+      }
+
+      const giftsArray = doubleParse(offerResult[0].gifts);
+      const gift = giftsArray.find((g) => g.id == gift_id);
+
+      if (!gift) {
+        return res.status(404).json({ error: "Gift not found in this offer" });
+      }
+
+      const [userResult] = await pool.query(
         `SELECT karigerPoints FROM users WHERE id = ?`,
         [user_id]
       );
@@ -71,30 +123,28 @@ export const RedeemRequest = asyncHandler(async (req, res) => {
       }
 
       const currentPoints = userResult[0].karigerPoints;
-      const pointsToDeduct = 10;
 
-      if (currentPoints < pointsToDeduct) {
+      if (currentPoints < gift?.points) {
         return res.status(400).json({ error: "Insufficient points" });
       }
 
-      await conn.execute(
+      await pool.execute(
         `UPDATE users SET karigerPoints = karigerPoints - ? WHERE id = ?`,
-        [pointsToDeduct, user_id]
+        [gift?.points, user_id]
       );
     }
 
     res.status(201).json({
       message: "Redeem request created, points deducted",
-      request_id: requestId, // Returning the generated request_id
+      request_id: requestId,
       id: insertedId,
     });
   } catch (err) {
     console.error("DB Error:", err);
     res.status(500).json({ error: "Database error" });
-  } finally {
-    conn.release();
   }
 });
+
 
 
 // get redeem request list
@@ -235,6 +285,18 @@ export const cancelRedeemRequest = asyncHandler(async (req, res) => {
     res.status(500).json({ error: "Database error" });
   }
 });
+// redeeem Status 
+export const RedeemStatus = asyncHandler(async (req, res) => {
+  const redeemStatus = [
+    { id: 1, name: "Pending" },
+    { id: 2, name: "Accepted" },
+    { id: 3, name: "Rejected" },
+    { id: 4, name: "Cancelled" },
+  ];
+
+  res.status(200).json(redeemStatus);
+  
+})
 
 
 

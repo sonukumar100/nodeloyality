@@ -122,7 +122,7 @@ export const getOffers = async (req, res) => {
     }
 
 
-    const [offers] = await pool.query(`SELECT * FROM offers ORDER BY created_at DESC`);
+    const [offers] = await pool.query(`SELECT * FROM offers ORDER BY offerStatus DESC, created_at DESC`);
 
     const parsedOffers = offers.map(offer => {
       return {
@@ -315,7 +315,6 @@ export const getOfferGifts = async (req, res) => {
 
     // Convert array of strings to array of objects
     if (Array.isArray(gifts) && typeof gifts[0] === 'string') {
-      console.log('gifts:sssssssssssssssssss', gifts),
 
       gifts = gifts.map((title, index) => ({
         id: index + 1,
