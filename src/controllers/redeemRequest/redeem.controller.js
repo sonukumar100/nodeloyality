@@ -1,5 +1,7 @@
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { pool } from '../../db/index.js';
+import {io}  from '../../index.js';
+// import { io } from '../server.js'; // import io instance from serveimport { io } from '../server.js'; // import io instance from server
 
 
 export const RedeemRequest = asyncHandler(async (req, res) => {
@@ -28,15 +30,15 @@ export const RedeemRequest = asyncHandler(async (req, res) => {
   } = req.body;
 
 //  get userdata
-  const userId = req.query.user_id;
+  console.log("sss",user_id);
   const userData = await pool.query(
-    `SELECT state, city FROM users WHERE id = ?`,
-    [userId]
-  );
+    `SELECT * FROM users WHERE id = ?`,
+    [user_id]
+  ); 
   const user = userData[0][0];
-  console.log(user);
+  console.log("ddd",user);
 
-  if(userData.otp !== otp){
+  if(user .otp !== otp){
     return res.status(400).json({ message: "Invalid OTP" });
   }
   // Basic required fields
@@ -132,8 +134,10 @@ export const RedeemRequest = asyncHandler(async (req, res) => {
         `UPDATE users SET karigerPoints = karigerPoints - ? WHERE id = ?`,
         [gift?.points, user_id]
       );
+      console.log("userDetail",user);
+      io.emit('redeemStatusUpdated', { requestId,user,gift})
     }
-
+   
     res.status(201).json({
       message: "Redeem request created, points deducted",
       request_id: requestId,
@@ -151,10 +155,23 @@ export const RedeemRequest = asyncHandler(async (req, res) => {
 export const getRedeemRequestList = asyncHandler(async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
+  const status = req.query.status; // Read status from query
   const offset = (page - 1) * limit;
 
   try {
-    // Join users, offers, and gifts
+    // Prepare filter condition if status is passed
+    let statusCondition = '';
+    let queryParams = [];
+
+    if (status !== undefined) {
+      statusCondition = 'WHERE rr.redeem_req_status = ?';
+      queryParams.push(status);
+    }
+
+    // Pagination params
+    queryParams.push(limit, offset);
+
+    // Fetch redeem requests
     const [redeemRequests] = await pool.query(
       `SELECT rr.*, 
               u.email AS email, u.karigerPoints AS karigerPoints, u.state AS state, u.city AS city,
@@ -164,15 +181,20 @@ export const getRedeemRequestList = asyncHandler(async (req, res) => {
        LEFT JOIN users u ON rr.user_id = u.id
        LEFT JOIN offers o ON rr.offer_id = o.id
        LEFT JOIN gifts g ON rr.gift_id = g.id
+       ${statusCondition}
        ORDER BY rr.id DESC
        LIMIT ? OFFSET ?`,
-      [limit, offset]
+      queryParams
     );
-    
 
-    // Get total count for pagination
-    const [[{ total }]] = await pool.query(
-      `SELECT COUNT(*) AS total FROM redeemrequest`
+    // Get total counts (global, not affected by filter)
+    const [[counts]] = await pool.query(
+      `SELECT 
+          COUNT(*) AS total,
+          SUM(CASE WHEN redeem_req_status = 0 THEN 1 ELSE 0 END) AS total_pending,
+          SUM(CASE WHEN redeem_req_status = 1 THEN 1 ELSE 0 END) AS total_approved,
+          SUM(CASE WHEN redeem_req_status = 2 THEN 1 ELSE 0 END) AS total_rejected
+       FROM redeemrequest`
     );
 
     res.status(200).json({
@@ -201,15 +223,41 @@ export const getRedeemRequestList = asyncHandler(async (req, res) => {
       pagination: {
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        total: counts.total,
+        totalPages: Math.ceil(counts.total / limit),
+        pending: counts.total_pending,
+        approved: counts.total_approved,
+        rejected: counts.total_rejected,
       },
+     
     });
   } catch (err) {
     console.error("DB Error:", err);
     res.status(500).json({ error: "Database error" });
   }
 });
+
+
+// total read_flag total unread flag
+export const getRedeemRequestCount = asyncHandler(async (req, res) => {
+  try {
+    const [total] = await pool.query(
+      `SELECT COUNT(*) AS total FROM redeemrequest`
+    );
+    const [unread] = await pool.query(
+      `SELECT COUNT(*) AS unread FROM redeemrequest WHERE read_flag = 0`
+    );
+    res.status(200).json({
+      total: total[0].total,
+      unread: unread[0].unread,   
+    })
+  }
+  catch (err) {
+    console.error("DB Error:", err);
+    res.status(500).json({ error: "Database error" });
+  }
+});
+
 
 
 
@@ -285,18 +333,15 @@ export const cancelRedeemRequest = asyncHandler(async (req, res) => {
     res.status(500).json({ error: "Database error" });
   }
 });
-// redeeem Status 
-export const RedeemStatus = asyncHandler(async (req, res) => {
-  const redeemStatus = [
-    { id: 1, name: "Pending" },
-    { id: 2, name: "Accepted" },
-    { id: 3, name: "Rejected" },
-    { id: 4, name: "Cancelled" },
-  ];
+// update redeem  Status 
+export const updateRedeemStatus = asyncHandler(async (req, res) => {
+  const { id, newStatus } = req.body; // Example: id = 5, newStatus = 1 (Approved)
 
-  res.status(200).json(redeemStatus);
-  
-})
+  await pool.query('UPDATE redeemrequest SET redeem_req_status = ? WHERE id = ?', [newStatus, id]);
+  res.status(200).json({ message: "Redeem status updated successfully." });
+});
+
+
 
 
 

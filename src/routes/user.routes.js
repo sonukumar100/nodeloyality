@@ -5,6 +5,7 @@ import { verifyJwt } from "../middlewares/auth.middleware.js";
 import { getFilteredCoupons } from "../controllers/generateCoupon.controller.js";
 import { scanCoupon } from "../controllers/generateCoupon.controller.js";
 import { cancelRedeemRequest, RedeemRequest } from "../controllers/redeemRequest/redeem.controller.js";
+import { pushNotification } from "../controllers/pushNotifications-controller.js";
 const router = Router();
 
 router.route("/register").post(
@@ -37,6 +38,7 @@ router.route('/redeem-request').post(RedeemRequest);
 router.route('/redeem-request/cancel').post(cancelRedeemRequest);
 router.route('/verify-user/:id').put(verifyUser);
 router.route('/delete-user/:id').delete(deleteUser);
+router.route('/send-notification').post(pushNotification);
 
 
 
