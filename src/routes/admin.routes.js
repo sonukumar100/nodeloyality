@@ -11,7 +11,7 @@ import { addOrUpdateVideo, deleteVideo, getAllVideos } from "../controllers/mast
 import { addCatalogItem, deleteCatalogItem, editCatalogItem, listCatalogItems } from "../controllers/master/catalog.controller.js";
 import { createOffer, getOfferGifts, getOffers, updateOffer, updateOfferStatus } from "../controllers/offers/offer.js";
 import { addGiftGallery, deleteGift, giftGalleryList, updateGift } from "../controllers/master/addGift.controller.js";
-import { getRedeemRequestCount, getRedeemRequestList, updateRedeemStatus } from "../controllers/redeemRequest/redeem.controller.js";
+import { getRedeemRequestCount, getRedeemRequestList, updateRedeemStatus, updateShippingStatus } from "../controllers/redeemRequest/redeem.controller.js";
 import { getAllUsers, getUserById } from "../controllers/user.controller.js";
 
 const router = Router();
@@ -100,6 +100,7 @@ router.route('/get-all-users').get(getAllUsers)
 router.route('/get-all-users/:id').get(getUserById);
 router.route('/update-redeem-status').post(updateRedeemStatus);
 router.route('/get-all-redeem-req-count').get(getRedeemRequestCount);
+router.route('/shipped/status').post(updateShippingStatus);
 
 
 

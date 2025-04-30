@@ -258,14 +258,6 @@ export const getRedeemRequestCount = asyncHandler(async (req, res) => {
   }
 });
 
-
-
-
-
-
-
-
-
 export const cancelRedeemRequest = asyncHandler(async (req, res) => {
   const { redeemRequestId } = req.body;
 
@@ -340,6 +332,19 @@ export const updateRedeemStatus = asyncHandler(async (req, res) => {
   await pool.query('UPDATE redeemrequest SET redeem_req_status = ? WHERE id = ?', [newStatus, id]);
   res.status(200).json({ message: "Redeem status updated successfully." });
 });
+
+/// update shipped status
+export const updateShippingStatus = asyncHandler(async (req, res) => {
+  const { id, shipped_status,shipped_date,remark } = req.body; // Example: id = 5, newStatus = 1 (Approved)
+  console.log("shipped_status",shipped_status);
+  if(shipped_status == 1 || shipped_status == 2 || shipped_status == 3){
+    if(!shipped_date){
+      return res.status(400).json({ error: "Shipped date is required." });
+    }
+  }
+  await pool.query('UPDATE redeemrequest SET shipped_status =?, shipped_date =?, remark =? WHERE id =?', [shipped_status,shipped_date,remark, id]);
+  res.status(200).json({ message: "Shipping status updated successfully." });
+})
 
 
 

@@ -21,6 +21,7 @@ router.route("/register").post(
   ]),
   registerUser
 );
+router.route('/get-users').get(getAllUsers);
 router.route('/login').post(loginUser);
 router.route('/logout').get(verifyJwt, logoutUser);
 router.route('/refresh-token').get(verifyJwt, refreshAccessToken);

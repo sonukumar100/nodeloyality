@@ -173,17 +173,66 @@ const deleteUser = asyncHandler(async (req, res) => {
 /// get all users ///
 const getAllUsers = asyncHandler(async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM users WHERE is_deleted = 0');  
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = (page - 1) * limit;
+
+    // Get paginated user data
+    const [rows] = await pool.query(`
+      SELECT 
+        u.*,
+        COUNT(DISTINCT c.id) AS total_scan_count,
+        COALESCE(SUM(c.karigerPoints), 0) AS total_scan_value,
+        MAX(c.updatedAt) AS last_scan_date,
+        COUNT(DISTINCT re.id) AS total_redeem_requests
+      FROM users u
+      LEFT JOIN coupons c 
+        ON CAST(JSON_UNQUOTE(JSON_EXTRACT(c.user, '$.id')) AS UNSIGNED) = u.id
+      LEFT JOIN redeemrequest re 
+        ON re.user_id = u.id
+      WHERE u.is_deleted = 0
+      GROUP BY u.id
+      ORDER BY u.id DESC
+      LIMIT ? OFFSET ?
+    `, [limit, offset]);
+
+    // Get total counts
+    const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM users WHERE is_deleted = 0`);
+    // const [[{ totalActive }]] = await pool.query(`SELECT COUNT(*) AS totalActive FROM users WHERE is_deleted = 0 AND status = 'active'`);
+    // const [[{ totalInactive }]] = await pool.query(`SELECT COUNT(*) AS totalInactive FROM users WHERE is_deleted = 0 AND status = 'inactive'`);
+
+    const totalPages = Math.ceil(total / limit);
+
     if (rows.length === 0) {
       return res.status(404).json({ message: 'No users found' });
     }
-    res.status(200).json({ message: 'Users fetched successfully', users: rows });
+
+    res.status(200).json({
+      message: 'Users fetched successfully',
+      users: rows,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+        // totalActive,
+        // totalInactive,
+      },
+    });
   } catch (error) {
     console.error('Get all users error:', error);
     res.status(500).json({ message: 'Something went wrong' });
   }
-
 });
+
+
+
+
+
+
+
+
+
 /// get users by id ///
 const getUserById = asyncHandler(async (req, res) => {
   const { id } = req.params;
