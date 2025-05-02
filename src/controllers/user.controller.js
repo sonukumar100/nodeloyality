@@ -124,30 +124,26 @@ const registerUser = asyncHandler(async (req, res) => {
 //// verify users ///
 const verifyUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  console.log("id", id);
-
+  const { is_verified } = req.body;
+  if(!is_verified) {      
+    return res.status(400).json({ message: 'is_verified is required' });
+  }
   try {
     const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
-console.log("rows",rows);
     if (rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const user = rows[0];
+    // Update is_verified value based on payload
+    await pool.query('UPDATE users SET is_verified = ? WHERE id = ?', [is_verified, id]);
 
-
-    // Optionally check if the user is active
-    if (!user.isActive) {
-      await pool.query("UPDATE users SET isActive = 1 WHERE id = ?", [user.id]);
-      return res.status(200).json(new ApiResponse(200,  "User verified successfully!"));
-    }
-
-    res.status(200).json({ message: 'User verified', user });
+    res.status(200).json(new ApiResponse(200, "User verification status updated successfully!"));
   } catch (error) {
     console.error('Verify user error:', error);
     res.status(500).json({ message: 'Something went wrong' });
   }
 });
+
 /// delete user ///
 const deleteUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
@@ -176,6 +172,19 @@ const getAllUsers = asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
+    const filter = req.query.filter; // e.g., 'pending', 'verified', etc.
+
+    let whereClause = `u.is_deleted = 0`;
+    const params = [];
+
+    // If filter is passed, add it to where clause
+    if (filter) {
+      whereClause += ` AND u.is_verified = ?`;
+      params.push(filter);
+    }
+
+    // Add pagination values
+    params.push(limit, offset);
 
     // Get paginated user data
     const [rows] = await pool.query(`
@@ -190,22 +199,24 @@ const getAllUsers = asyncHandler(async (req, res) => {
         ON CAST(JSON_UNQUOTE(JSON_EXTRACT(c.user, '$.id')) AS UNSIGNED) = u.id
       LEFT JOIN redeemrequest re 
         ON re.user_id = u.id
-      WHERE u.is_deleted = 0
+      WHERE ${whereClause}
       GROUP BY u.id
       ORDER BY u.id DESC
       LIMIT ? OFFSET ?
-    `, [limit, offset]);
+    `, params);
 
-    // Get total counts
+    // Get total counts for stats
     const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM users WHERE is_deleted = 0`);
-    // const [[{ totalActive }]] = await pool.query(`SELECT COUNT(*) AS totalActive FROM users WHERE is_deleted = 0 AND status = 'active'`);
-    // const [[{ totalInactive }]] = await pool.query(`SELECT COUNT(*) AS totalInactive FROM users WHERE is_deleted = 0 AND status = 'inactive'`);
+    const [[{ totalPending }]] = await pool.query(`SELECT COUNT(*) AS totalPending FROM users WHERE is_deleted = 0 AND is_verified = 'pending'`);
+    const [[{ totalVerified }]] = await pool.query(`SELECT COUNT(*) AS totalVerified FROM users WHERE is_deleted = 0 AND is_verified = 'verified'`);
+    const [[{ totalRejected }]] = await pool.query(`SELECT COUNT(*) AS totalRejected FROM users WHERE is_deleted = 0 AND is_verified = 'rejected'`);
+    const [[{ totalSuspect }]] = await pool.query(`SELECT COUNT(*) AS totalSuspect FROM users WHERE is_deleted = 0 AND is_verified = 'suspect'`);
 
     const totalPages = Math.ceil(total / limit);
 
-    if (rows.length === 0) {
-      return res.status(404).json({ message: 'No users found' });
-    }
+    // if (rows.length === 0) {
+    //   return res.status(404).json({ message: 'No users found' });
+    // }
 
     res.status(200).json({
       message: 'Users fetched successfully',
@@ -215,8 +226,10 @@ const getAllUsers = asyncHandler(async (req, res) => {
         page,
         limit,
         totalPages,
-        // totalActive,
-        // totalInactive,
+        totalVerified,
+        totalPending,
+        totalRejected,
+        totalSuspect,
       },
     });
   } catch (error) {
@@ -224,14 +237,6 @@ const getAllUsers = asyncHandler(async (req, res) => {
     res.status(500).json({ message: 'Something went wrong' });
   }
 });
-
-
-
-
-
-
-
-
 
 /// get users by id ///
 const getUserById = asyncHandler(async (req, res) => {

@@ -13,6 +13,7 @@ import { createOffer, getOfferGifts, getOffers, updateOffer, updateOfferStatus }
 import { addGiftGallery, deleteGift, giftGalleryList, updateGift } from "../controllers/master/addGift.controller.js";
 import { getRedeemRequestCount, getRedeemRequestList, updateRedeemStatus, updateShippingStatus } from "../controllers/redeemRequest/redeem.controller.js";
 import { getAllUsers, getUserById } from "../controllers/user.controller.js";
+import { createFaq, getFaqList } from "../controllers/faq/faq.controller.js";
 
 const router = Router();
 // router.route('/add-gift').post( upload.fields([
@@ -101,6 +102,8 @@ router.route('/get-all-users/:id').get(getUserById);
 router.route('/update-redeem-status').post(updateRedeemStatus);
 router.route('/get-all-redeem-req-count').get(getRedeemRequestCount);
 router.route('/shipped/status').post(updateShippingStatus);
+router.route('/create/faq').post(createFaq);
+router.route('/get/faq').get(getFaqList);
 
 
 
