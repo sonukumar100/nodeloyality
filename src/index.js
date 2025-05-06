@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { pool } from './db/index.js';
 import { getMessagesByRoomId } from './utils/message.js';
-
+import './cron/user-register.js';
 
 // Fix __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);

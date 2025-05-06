@@ -6,22 +6,7 @@ import ApiError from '../utils/ApiError.js';
 import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db/index.js';
 import { Transform, Readable } from 'stream';
-const data = [
-  { id: 1, name: 'Alice', email: 'alice@example.com' },
-  { id: 2, name: 'Bob', email: 'bob@example.com' },
-];
-function convertToCSV(data) {
-  const headers = Object.keys(data[0]).join(',') + '\n';
-  const rows = data.map(row => Object.values(row).join(',')).join('\n') + '\n';
-  return headers + rows;
-}
-// Transform stream to convert text to uppercase
-const upperCaseTransform = new Transform({
-  transform(chunk, encoding, callback) {
-    this.push(chunk.toString().toUpperCase());
-    callback();
-  },
-});
+
 
 
  const generateCoupon = asyncHandler(async (req, res) => {
@@ -386,17 +371,45 @@ const updateCoupon = asyncHandler(async (req, res) => {
   }
 }
 );
+// ✅ Generate 100,000 dummy rows
+const generateDummyData = (count = 10000000) => {
+  const data = [];
+  for (let i = 1; i <= count; i++) {
+    data.push({
+      id: i,
+      name: `User${i}`,
+      email: `user${i}@example.com`,
+    });
+  }
+  return data;
+};
+
+function convertToCSV(data) {
+  const headers = Object.keys(data[0]).join(',') + '\n';
+  const rows = data.map(row => Object.values(row).join(',')).join('\n') + '\n';
+  return headers + rows;
+}
+
+// Transform to uppercase (demo purpose)
+const upperCaseTransform = new Transform({
+  transform(chunk, encoding, callback) {
+    this.push(chunk.toString().toUpperCase());
+    callback();
+  },
+});
+
 export const downloadCsv = asyncHandler(async (req, res) => {
+  const data = generateDummyData(100000); // ✅ Generate 100k rows
   const csvData = convertToCSV(data);
-  const readable = Readable.from([csvData]); // create a stream from CSV string
+  const readable = Readable.from([csvData]);
 
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename=data.csv');
 
-  // Pipe the CSV through the uppercase transform to the response
-  readable.pipe(upperCaseTransform).pipe(res);
-
-})
-
+  readable
+    .pipe(upperCaseTransform)
+    .pipe(res)
+    .on('finish', () => res.end());
+});
 export { generateCoupon,scanCoupon,getFilteredCoupons,deleteCoupon,updateCoupon};
 
