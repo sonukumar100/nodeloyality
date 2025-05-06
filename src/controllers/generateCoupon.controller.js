@@ -5,6 +5,24 @@ import { ApiResponse } from '../utils/ApiResponse.js';
 import ApiError from '../utils/ApiError.js';
 import { v4 as uuidv4 } from 'uuid';
 import { pool } from '../db/index.js';
+import { Transform, Readable } from 'stream';
+const data = [
+  { id: 1, name: 'Alice', email: 'alice@example.com' },
+  { id: 2, name: 'Bob', email: 'bob@example.com' },
+];
+function convertToCSV(data) {
+  const headers = Object.keys(data[0]).join(',') + '\n';
+  const rows = data.map(row => Object.values(row).join(',')).join('\n') + '\n';
+  return headers + rows;
+}
+// Transform stream to convert text to uppercase
+const upperCaseTransform = new Transform({
+  transform(chunk, encoding, callback) {
+    this.push(chunk.toString().toUpperCase());
+    callback();
+  },
+});
+
 
  const generateCoupon = asyncHandler(async (req, res) => {
   const {  product_id, couponCount,remark } = req.body;
@@ -157,8 +175,6 @@ const scanCoupon = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Database error: " + error.message);
   }
 });
-
-  
 const getFilteredCoupons = asyncHandler(async (req, res) => {
   const { filter, couponGroup, userId } = req.query;
   const page = parseInt(req.query.page) || 1;
@@ -311,10 +327,6 @@ const getFilteredCoupons = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Database error: " + error.message);
   }
 });
-
-
-
-
 const deleteCoupon = asyncHandler(async (req, res) => {
   const { id } = req.params;
   console.log("ID:", req.params);
@@ -374,7 +386,17 @@ const updateCoupon = asyncHandler(async (req, res) => {
   }
 }
 );
+export const downloadCsv = asyncHandler(async (req, res) => {
+  const csvData = convertToCSV(data);
+  const readable = Readable.from([csvData]); // create a stream from CSV string
 
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=data.csv');
 
-    export { generateCoupon,scanCoupon,getFilteredCoupons,deleteCoupon,updateCoupon};
+  // Pipe the CSV through the uppercase transform to the response
+  readable.pipe(upperCaseTransform).pipe(res);
+
+})
+
+export { generateCoupon,scanCoupon,getFilteredCoupons,deleteCoupon,updateCoupon};
 

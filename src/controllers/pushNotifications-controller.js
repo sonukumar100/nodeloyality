@@ -15,7 +15,7 @@ export const pushNotification = asyncHandler(async (req, res) => {
     //     return res.status(404).json({ error: 'No Expo token found for this user.' });
     //   }
   
-      const token = "ExponentPushToken[YizTI4Plggiux04wOWMSjz]"
+      const token = "ExponentPushToken[p4o6V6IqTYyeYDcsxyqLee]"
   
       // 2. Construct notification payload
       const message = {

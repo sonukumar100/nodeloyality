@@ -4,7 +4,7 @@ import { upload } from "../middlewares/multer.middleware.js";
 import { verifyJwt } from "../middlewares/auth.middleware.js";
 import { fileUpload } from "../controllers/file.controller.js";
 import { videoUpload } from "../controllers/video.controller.js";
-import { deleteCoupon, generateCoupon, getFilteredCoupons, updateCoupon } from "../controllers/generateCoupon.controller.js";
+import { deleteCoupon, downloadCsv, generateCoupon, getFilteredCoupons, updateCoupon } from "../controllers/generateCoupon.controller.js";
 import { addOrUpdateProduct, deleteProduct, getAllMasterProducts } from "../controllers/masterProduct.controller.js";
 import { addAccessLimit, getAccessLimit } from "../controllers/master/dailyCouponAccess.js";
 import { addOrUpdateVideo, deleteVideo, getAllVideos } from "../controllers/master/addVideo.controller.js";
@@ -14,6 +14,8 @@ import { addGiftGallery, deleteGift, giftGalleryList, updateGift } from "../cont
 import { getRedeemRequestCount, getRedeemRequestList, updateRedeemStatus, updateShippingStatus } from "../controllers/redeemRequest/redeem.controller.js";
 import { getAllUsers, getUserById } from "../controllers/user.controller.js";
 import { createFaq, getFaqList } from "../controllers/faq/faq.controller.js";
+import { getDetailsForMsg, getMsg, getUniqueSenderId } from "../controllers/Chat/message.controller.js";
+import { pushNotification } from "../controllers/pushNotifications-controller.js";
 
 const router = Router();
 // router.route('/add-gift').post( upload.fields([
@@ -104,6 +106,11 @@ router.route('/get-all-redeem-req-count').get(getRedeemRequestCount);
 router.route('/shipped/status').post(updateShippingStatus);
 router.route('/create/faq').post(createFaq);
 router.route('/get/faq').get(getFaqList);
+router.route('/get/msg').get(getMsg);
+router.route('/get-msg-unique-data').get(getUniqueSenderId)
+router.route('/get-details/msg').get(getDetailsForMsg);
+router.route('/push-notification').post(pushNotification);
+router.route('/download-csv').get(downloadCsv);
 
 
 
